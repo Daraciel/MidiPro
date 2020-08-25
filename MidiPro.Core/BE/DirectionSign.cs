@@ -1,4 +1,4 @@
-﻿namespace MidiPro.Core.GP
+﻿namespace MidiPro.Core.BE
 {
     public class DirectionSign
     {

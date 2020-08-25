@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-using MidiPro.Core.BE;
+using MidiPro.Core.Enums;
 using MidiPro.Core.GP.Enums;
 
 namespace MidiPro.Core.GP

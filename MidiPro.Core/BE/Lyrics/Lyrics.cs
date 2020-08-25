@@ -1,4 +1,4 @@
-﻿namespace MidiPro.Core.GP.Lyrics
+﻿namespace MidiPro.Core.BE.Lyrics
 {
     public class Lyrics
     {

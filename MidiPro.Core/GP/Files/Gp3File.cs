@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using MidiPro.Core.BE;
+using MidiPro.Core.Enums;
 using MidiPro.Core.GP.Beat;
 using MidiPro.Core.GP.Enums;
 using MidiPro.Core.GP.Harmonic;
@@ -1138,8 +1139,8 @@ namespace MidiPro.Core.GP.Files
             constists of number of starting measure encoded in :ref:`int`
             and :ref:`int-size-string` holding text of the lyric line.*/
 
-            Lyrics = new List<Lyrics.Lyrics>();
-            var lyrics = new Lyrics.Lyrics();
+            Lyrics = new List<BE.Lyrics.Lyrics>();
+            var lyrics = new BE.Lyrics.Lyrics();
             lyrics.TrackChoice = GpBase.ReadInt()[0];
             for (int x = 0; x < lyrics.Lines.Length; x++)
             {

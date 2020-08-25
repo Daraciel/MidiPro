@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 using MidiPro.Core.BE;
-using MidiPro.Core.GP.Enums;
+using MidiPro.Core.Enums;
 using MidiPro.Core.GP.Rse;
 
 namespace MidiPro.Core.GP.Files
@@ -32,7 +32,7 @@ namespace MidiPro.Core.GP.Files
         public string Instructional;
         public int[] VersionTuple = new int[] { };
         public string Version = "";
-        public List<Lyrics.Lyrics> Lyrics = new List<Lyrics.Lyrics>();
+        public List<BE.Lyrics.Lyrics> Lyrics = new List<BE.Lyrics.Lyrics>();
         public List<MeasureHeader> MeasureHeaders = new List<MeasureHeader>();
         public TripletFeels TripletFeel;
     }

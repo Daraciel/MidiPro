@@ -1,4 +1,4 @@
-﻿namespace MidiPro.Core.GP.Enums
+﻿namespace MidiPro.Core.Enums
 {
     public enum TripletFeels
     {
