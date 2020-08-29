@@ -14,36 +14,72 @@ namespace MidiPro.Core.Native
 {
     public class NativeFormat
     {
+        public static bool[] AvailableChannels = new bool[16];
 
-        public string title = "";
-        public string subtitle = "";
-        public string artist = "";
-        public string album = "";
-        public string words = "";
-        public string music = "";
+        public string Title { get; set; }
+        public string Subtitle { get; set; }
+        public string Artist { get; set; }
+        public string Album { get; set; }
+        public string Words { get; set; }
+        public string Music { get; set; }
 
-        public List<DirectionSign> directions = new List<DirectionSign>();
-        public List<Annotation> annotations = new List<Annotation>();
-        public List<Tempo> tempos = new List<Tempo>();
-        public List<MasterBar> barMaster = new List<MasterBar>();
-        public List<Track> tracks = new List<Track>();
-        public List<Lyrics> lyrics = new List<Lyrics>();
+        public List<DirectionSign> Directions { get; set; }
+        public List<Annotation> Annotations { get; set; }
+        public List<Tempo> Tempos { get; set; }
+        public List<MasterBar> BarMaster { get; set; }
+        public List<Track> Tracks { get; set; }
+        public List<Lyrics> Lyrics { get; set; }
 
 
-        private List<int> notesInMeasures = new List<int>();
-        public static bool[] availableChannels = new bool[16];
-        public Midi.MidiExport toMidi()
+        private List<int> _notesInMeasures;
+
+        public NativeFormat()
+        {
+            Title = string.Empty;
+            Subtitle = string.Empty;
+            Artist = string.Empty;
+            Album = string.Empty;
+            Words = string.Empty;
+            Music = string.Empty;
+
+            Directions = new List<DirectionSign>();
+            Annotations = new List<Annotation>();
+            Tempos = new List<Tempo>();
+            BarMaster = new List<MasterBar>();
+            Tracks = new List<Track>();
+            Lyrics = new List<Lyrics>();
+
+            _notesInMeasures = new List<int>();
+        }
+
+        public NativeFormat(GpFile fromFile) : this()
+        {
+            Title = fromFile.Title;
+            Subtitle = fromFile.Subtitle;
+            Artist = fromFile.Interpret;
+            Album = fromFile.Album;
+            Words = fromFile.Words;
+            Music = fromFile.Music;
+            Tempos = RetrieveTempos(fromFile);
+            Directions = fromFile.Directions;
+            BarMaster = RetrieveMasterBars(fromFile);
+            Tracks = RetrieveTracks(fromFile);
+            Lyrics = fromFile.Lyrics;
+            UpdateAvailableChannels();
+        }
+
+        public Midi.MidiExport ToMidi()
         {
             Midi.MidiExport mid = new Midi.MidiExport();
-            mid.midiTracks.Add(getMidiHeader()); //First, untitled track
-            foreach (Track track in tracks)
+            mid.MidiTracks.Add(GetMidiHeader()); //First, untitled track
+            foreach (Track track in Tracks)
             {
-                mid.midiTracks.Add(track.getMidi());
+                mid.MidiTracks.Add(track.GetMidi());
             }
             return mid;
         }
 
-        private Midi.MidiTrack getMidiHeader()
+        private Midi.MidiTrack GetMidiHeader()
         {
             var midiHeader = new Midi.MidiTrack();
             //text(s) - name of song, artist etc., created by Gitaro 
@@ -54,16 +90,16 @@ namespace MidiPro.Core.Native
             //set tempo
             ///////marker text (will be seen in file) - also Gitaro copyright blabla
             //end_of_track
-            midiHeader.messages.Add(new Midi.MidiMessage("track_name", new string[] { "untitled" }, 0));
-            midiHeader.messages.Add(new Midi.MidiMessage("text", new string[] { title }, 0));
-            midiHeader.messages.Add(new Midi.MidiMessage("text", new string[] { subtitle }, 0));
-            midiHeader.messages.Add(new Midi.MidiMessage("text", new string[] { artist }, 0));
-            midiHeader.messages.Add(new Midi.MidiMessage("text", new string[] { album }, 0));
-            midiHeader.messages.Add(new Midi.MidiMessage("text", new string[] { words }, 0));
-            midiHeader.messages.Add(new Midi.MidiMessage("text", new string[] { music }, 0));
-            midiHeader.messages.Add(new Midi.MidiMessage("copyright", new string[] { "Copyright 2017 by Gitaro" }, 0));
-            midiHeader.messages.Add(new Midi.MidiMessage("marker", new string[] { title + " / " + artist + " - Copyright 2017 by Gitaro" }, 0));
-            midiHeader.messages.Add(new Midi.MidiMessage("midi_port", new string[] { "0" }, 0));
+            midiHeader.Messages.Add(new Midi.MidiMessage("track_name", new string[] { "untitled" }, 0));
+            midiHeader.Messages.Add(new Midi.MidiMessage("text", new string[] { Title }, 0));
+            midiHeader.Messages.Add(new Midi.MidiMessage("text", new string[] { Subtitle }, 0));
+            midiHeader.Messages.Add(new Midi.MidiMessage("text", new string[] { Artist }, 0));
+            midiHeader.Messages.Add(new Midi.MidiMessage("text", new string[] { Album }, 0));
+            midiHeader.Messages.Add(new Midi.MidiMessage("text", new string[] { Words }, 0));
+            midiHeader.Messages.Add(new Midi.MidiMessage("text", new string[] { Music }, 0));
+            midiHeader.Messages.Add(new Midi.MidiMessage("copyright", new string[] { "Copyright 2017 by Gitaro" }, 0));
+            midiHeader.Messages.Add(new Midi.MidiMessage("marker", new string[] { Title + " / " + Artist + " - Copyright 2017 by Gitaro" }, 0));
+            midiHeader.Messages.Add(new Midi.MidiMessage("midi_port", new string[] { "0" }, 0));
 
             //Get tempos from List tempos, get key_signature and time_signature from barMaster
             var tempoIndex = 0;
@@ -71,120 +107,104 @@ namespace MidiPro.Core.Native
             var currentIndex = 0;
             var oldTimeSignature = "";
             var oldKeySignature = "";
-            if (tempos.Count == 0) tempos.Add(new Tempo());
-            while (tempoIndex < tempos.Count || masterBarIndex < barMaster.Count)
+            if (Tempos.Count == 0) Tempos.Add(new Tempo());
+            while (tempoIndex < Tempos.Count || masterBarIndex < BarMaster.Count)
             {
 
                 //Compare next entry of both possible sources
-                if (tempoIndex == tempos.Count || tempos[tempoIndex].position >= barMaster[masterBarIndex].index) //next measure comes first
+                if (tempoIndex == Tempos.Count || Tempos[tempoIndex].Position >= BarMaster[masterBarIndex].Index) //next measure comes first
                 {
-                    if (!barMaster[masterBarIndex].keyBoth.Equals(oldKeySignature))
+                    if (!BarMaster[masterBarIndex].KeyBoth.Equals(oldKeySignature))
                     {
                         //Add Key-Sig to midiHeader
-                        midiHeader.messages.Add(new Midi.MidiMessage("key_signature", new string[] { "" + barMaster[masterBarIndex].key, "" + barMaster[masterBarIndex].keyType }, barMaster[masterBarIndex].index - currentIndex));
-                        currentIndex = barMaster[masterBarIndex].index;
+                        midiHeader.Messages.Add(new Midi.MidiMessage("key_signature", new string[] { "" + BarMaster[masterBarIndex].Key, "" + BarMaster[masterBarIndex].KeyType }, BarMaster[masterBarIndex].Index - currentIndex));
+                        currentIndex = BarMaster[masterBarIndex].Index;
 
-                        oldKeySignature = barMaster[masterBarIndex].keyBoth;
+                        oldKeySignature = BarMaster[masterBarIndex].KeyBoth;
                     }
-                    if (!barMaster[masterBarIndex].time.Equals(oldTimeSignature))
+                    if (!BarMaster[masterBarIndex].Time.Equals(oldTimeSignature))
                     {
                         //Add Time-Sig to midiHeader
-                        midiHeader.messages.Add(new Midi.MidiMessage("time_signature", new string[] { "" + barMaster[masterBarIndex].num, "" + barMaster[masterBarIndex].den, "24", "8" }, barMaster[masterBarIndex].index - currentIndex));
-                        currentIndex = barMaster[masterBarIndex].index;
+                        midiHeader.Messages.Add(new Midi.MidiMessage("time_signature", new string[] { "" + BarMaster[masterBarIndex].Num, "" + BarMaster[masterBarIndex].Den, "24", "8" }, BarMaster[masterBarIndex].Index - currentIndex));
+                        currentIndex = BarMaster[masterBarIndex].Index;
 
-                        oldTimeSignature = barMaster[masterBarIndex].time;
+                        oldTimeSignature = BarMaster[masterBarIndex].Time;
                     }
                     masterBarIndex++;
                 }
                 else //next tempo signature comes first
                 {
                     //Add Tempo-Sig to midiHeader
-                    int _tempo = (int)(Math.Round((60 * 1000000) / tempos[tempoIndex].value));
-                    midiHeader.messages.Add(new Midi.MidiMessage("set_tempo", new string[] { "" + _tempo }, tempos[tempoIndex].position - currentIndex));
-                    currentIndex = tempos[tempoIndex].position;
+                    int tempo = (int)(Math.Round((60 * 1000000) / Tempos[tempoIndex].Value));
+                    midiHeader.Messages.Add(new Midi.MidiMessage("set_tempo", new string[] { "" + tempo }, Tempos[tempoIndex].Position - currentIndex));
+                    currentIndex = Tempos[tempoIndex].Position;
                     tempoIndex++;
                 }
             }
 
 
 
-            midiHeader.messages.Add(new Midi.MidiMessage("end_of_track", new string[] { }, 0));
+            midiHeader.Messages.Add(new Midi.MidiMessage("end_of_track", new string[] { }, 0));
 
 
             return midiHeader;
         }
 
 
-        public NativeFormat(GpFile fromFile)
-        {
-            title = fromFile.Title;
-            subtitle = fromFile.Subtitle;
-            artist = fromFile.Interpret;
-            album = fromFile.Album;
-            words = fromFile.Words;
-            music = fromFile.Music;
-            tempos = retrieveTempos(fromFile);
-            directions = fromFile.Directions;
-            barMaster = retrieveMasterBars(fromFile);
-            tracks = retrieveTracks(fromFile);
-            lyrics = fromFile.Lyrics;
-            updateAvailableChannels();
-        }
-
-        private void updateAvailableChannels()
+        private void UpdateAvailableChannels()
         {
 
-            for (int x = 0; x < 16; x++) { if (x != 9) { availableChannels[x] = true; } else { availableChannels[x] = false; } }
-            foreach (Track track in tracks)
+            for (int x = 0; x < 16; x++) { if (x != 9) { AvailableChannels[x] = true; } else { AvailableChannels[x] = false; } }
+            foreach (Track track in Tracks)
             {
-                availableChannels[track.channel] = false;
+                AvailableChannels[track.Channel] = false;
             }
         }
 
-        public List<Track> retrieveTracks(GpFile file)
+        public List<Track> RetrieveTracks(GpFile file)
         {
             List<Track> tracks = new List<Track>();
             foreach (GP.Track tr in file.Tracks)
             {
                 Track track = new Track();
-                track.name = tr.Name;
-                track.patch = tr.Channel.Instrument;
-                track.port = tr.Port;
-                track.channel = tr.Channel.Channel;
-                track.playbackState = PlaybackStates.def;
-                track.capo = tr.Offset;
-                if (tr.IsMute) track.playbackState = PlaybackStates.mute;
-                if (tr.IsSolo) track.playbackState = PlaybackStates.solo;
-                track.tuning = getTuning(tr.Strings);
+                track.Name = tr.Name;
+                track.Patch = tr.Channel.Instrument;
+                track.Port = tr.Port;
+                track.Channel = tr.Channel.Channel;
+                track.PlaybackState = PlaybackStates.Def;
+                track.Capo = tr.Offset;
+                if (tr.IsMute) track.PlaybackState = PlaybackStates.Mute;
+                if (tr.IsSolo) track.PlaybackState = PlaybackStates.Solo;
+                track.Tuning = GetTuning(tr.Strings);
 
-                track.notes = retrieveNotes(tr, track.tuning, track);
+                track.Notes = RetrieveNotes(tr, track.Tuning, track);
                 tracks.Add(track);
             }
 
             return tracks;
         }
 
-        public void addToTremoloBarList(int index, int duration, BendEffect bend, Track myTrack)
+        public void AddToTremoloBarList(int index, int duration, BendEffect bend, Track myTrack)
         {
             int at;
-            myTrack.tremoloPoints.Add(new TremoloPoint(0.0f, index)); //So that it can later be recognized as the beginning
+            myTrack.TremoloPoints.Add(new TremoloPoint(0.0f, index)); //So that it can later be recognized as the beginning
             foreach (GP.BendPoint bp in bend.Points)
             {
                 at = index + (int)(bp.Gp6Position * duration / 100.0f);
                 var point = new TremoloPoint();
-                point.index = at;
-                point.value = bp.Gp6Value;
-                myTrack.tremoloPoints.Add(point);
+                point.Index = at;
+                point.Value = bp.Gp6Value;
+                myTrack.TremoloPoints.Add(point);
             }
             var tp = new TremoloPoint();
-            tp.index = index + duration;
-            tp.value = 0;
-            myTrack.tremoloPoints.Add(tp); //Back to 0 -> Worst case there will be on the same index the final of tone 1, 0, and the beginning of tone 2.
+            tp.Index = index + duration;
+            tp.Value = 0;
+            myTrack.TremoloPoints.Add(tp); //Back to 0 -> Worst case there will be on the same index the final of tone 1, 0, and the beginning of tone 2.
 
 
         }
 
-        public List<BendPoint> getBendPoints(int index, int duration, BendEffect bend)
+        public List<BendPoint> GetBendPoints(int index, int duration, BendEffect bend)
         {
             List<BendPoint> ret = new List<BendPoint>();
             int at;
@@ -192,8 +212,8 @@ namespace MidiPro.Core.Native
             {
                 at = index + (int)(bp.Gp6Position * duration / 100.0f);
                 var point = new BendPoint();
-                point.index = at;
-                point.value = bp.Gp6Value;
+                point.Index = at;
+                point.Value = bp.Gp6Value;
                 ret.Add(point);
             }
 
@@ -202,14 +222,14 @@ namespace MidiPro.Core.Native
 
 
 
-        public List<Note> retrieveNotes(GP.Track track, int[] tuning, Track myTrack)
+        public List<Note> RetrieveNotes(GP.Track track, int[] tuning, Track myTrack)
         {
 
             List<Note> notes = new List<Note>();
             int index = 0;
-            Note[] last_notes = new Note[10];
-            bool[] last_was_tie = new bool[10];
-            for (int x = 0; x < 10; x++) { last_was_tie[x] = false; }
+            Note[] lastNotes = new Note[10];
+            bool[] lastWasTie = new bool[10];
+            for (int x = 0; x < 10; x++) { lastWasTie[x] = false; }
 
             //GraceNotes if on beat - reducing the next note's length
             bool rememberGrace = false;
@@ -217,7 +237,7 @@ namespace MidiPro.Core.Native
             int graceLength = 0;
             int subtractSubindex = 0;
 
-            for (int x = 0; x < 10; x++) last_notes[x] = null;
+            for (int x = 0; x < 10; x++) lastNotes[x] = null;
             int measureIndex = -1;
             int notesInMeasure = 0;
             foreach (Measure m in track.Measures)
@@ -228,13 +248,13 @@ namespace MidiPro.Core.Native
                 bool skipVoice = false;
                 if (m.SimileMark == SimileMarks.Simple) //Repeat last measure
                 {
-                    int amountNotes = notesInMeasures[notesInMeasures.Count - 1]; //misuse prohibited by guitarpro
+                    int amountNotes = _notesInMeasures[_notesInMeasures.Count - 1]; //misuse prohibited by guitarpro
                     int endPoint = notes.Count;
                     for (int x = endPoint - amountNotes; x < endPoint; x++)
                     {
                         Note newNote = new Note(notes[x]);
                         Measure oldM = track.Measures[measureIndex - 1];
-                        newNote.index += flipDuration(oldM.Header.TimeSignature.Denominator) * oldM.Header.TimeSignature.Numerator;
+                        newNote.Index += FlipDuration(oldM.Header.TimeSignature.Denominator) * oldM.Header.TimeSignature.Numerator;
                         notes.Add(newNote);
                         notesInMeasure++;
                     }
@@ -242,16 +262,16 @@ namespace MidiPro.Core.Native
                 }
                 if (m.SimileMark == SimileMarks.FirstOfDouble || m.SimileMark == SimileMarks.SecondOfDouble) //Repeat first or second of last two measures
                 {
-                    int secondAmount = notesInMeasures[notesInMeasures.Count - 1]; //misuse prohibited by guitarpro
-                    int firstAmount = notesInMeasures[notesInMeasures.Count - 2];
+                    int secondAmount = _notesInMeasures[_notesInMeasures.Count - 1]; //misuse prohibited by guitarpro
+                    int firstAmount = _notesInMeasures[_notesInMeasures.Count - 2];
                     int endPoint = notes.Count - secondAmount;
                     for (int x = endPoint - firstAmount; x < endPoint; x++)
                     {
                         Note newNote = new Note(notes[x]);
                         Measure oldM1 = track.Measures[measureIndex - 2];
                         Measure oldM2 = track.Measures[measureIndex - 1];
-                        newNote.index += flipDuration(oldM1.Header.TimeSignature.Denominator) * oldM1.Header.TimeSignature.Numerator;
-                        newNote.index += flipDuration(oldM2.Header.TimeSignature.Denominator) * oldM2.Header.TimeSignature.Numerator;
+                        newNote.Index += FlipDuration(oldM1.Header.TimeSignature.Denominator) * oldM1.Header.TimeSignature.Numerator;
+                        newNote.Index += FlipDuration(oldM2.Header.TimeSignature.Denominator) * oldM2.Header.TimeSignature.Numerator;
                         notes.Add(newNote);
                         notesInMeasure++;
                     }
@@ -265,9 +285,9 @@ namespace MidiPro.Core.Native
                     foreach (Beat b in v.Beats)
                     {
 
-                        if (b.Text != null && !b.Text.Value.Equals("")) annotations.Add(new Annotation(b.Text.Value, index + subIndex));
+                        if (b.Text != null && !b.Text.Value.Equals("")) Annotations.Add(new Annotation(b.Text.Value, index + subIndex));
 
-                        if (b.Effect.TremoloBar != null) addToTremoloBarList(index + subIndex, flipDuration(b.Duration), b.Effect.TremoloBar, myTrack);
+                        if (b.Effect.TremoloBar != null) AddToTremoloBarList(index + subIndex, FlipDuration(b.Duration), b.Effect.TremoloBar, myTrack);
 
 
                         //Prepare Brush or Arpeggio
@@ -285,8 +305,8 @@ namespace MidiPro.Core.Native
                                 hasBrush = true;
                                 Duration temp = new Duration();
                                 temp.Value = b.Effect.Stroke.Value;
-                                int brushTotalDuration = flipDuration(temp);
-                                int beatTotalDuration = flipDuration(b.Duration);
+                                int brushTotalDuration = FlipDuration(temp);
+                                int beatTotalDuration = FlipDuration(b.Duration);
 
 
                                 brushIncrease = brushTotalDuration / (notesCnt);
@@ -309,44 +329,44 @@ namespace MidiPro.Core.Native
                         {
                             Note note = new Note();
                             //Beat values
-                            note.isTremBarVibrato = b.Effect.Vibrato;
-                            note.fading = Fadings.none;
-                            if (b.Effect.FadeIn) note.fading = Fadings.fadeIn;
-                            if (b.Effect.FadeOut) note.fading = Fadings.fadeOut;
-                            if (b.Effect.VolumeSwell) note.fading = Fadings.volumeSwell;
-                            note.isSlapped = b.Effect.SlapEffect == SlapEffects.Slapping;
-                            note.isPopped = b.Effect.SlapEffect == SlapEffects.Popping;
-                            note.isHammer = n.Effect.Hammer;
-                            note.isRHTapped = b.Effect.SlapEffect == SlapEffects.Tapping;
-                            note.index = index + subIndex;
-                            note.duration = flipDuration(b.Duration);
+                            note.IsTremoloBarVibrato = b.Effect.Vibrato;
+                            note.Fading = Fadings.None;
+                            if (b.Effect.FadeIn) note.Fading = Fadings.FadeIn;
+                            if (b.Effect.FadeOut) note.Fading = Fadings.FadeOut;
+                            if (b.Effect.VolumeSwell) note.Fading = Fadings.VolumeSwell;
+                            note.IsSlapped = b.Effect.SlapEffect == SlapEffects.Slapping;
+                            note.IsPopped = b.Effect.SlapEffect == SlapEffects.Popping;
+                            note.IsHammer = n.Effect.Hammer;
+                            note.IsRhTapped = b.Effect.SlapEffect == SlapEffects.Tapping;
+                            note.Index = index + subIndex;
+                            note.Duration = FlipDuration(b.Duration);
 
 
                             //Note values
-                            note.fret = n.Value;
-                            note.str = n.Str;
-                            note.velocity = n.Velocity;
-                            note.isVibrato = n.Effect.Vibrato;
-                            note.isPalmMuted = n.Effect.PalmMute;
-                            note.isMuted = n.Type == NoteTypes.Dead;
+                            note.Fret = n.Value;
+                            note.Str = n.Str;
+                            note.Velocity = n.Velocity;
+                            note.IsVibrato = n.Effect.Vibrato;
+                            note.IsPalmMuted = n.Effect.PalmMute;
+                            note.IsMuted = n.Type == NoteTypes.Dead;
 
                             if (n.Effect.Harmonic != null)
                             {
-                                note.harmonicFret = n.Effect.Harmonic.Fret;
+                                note.HarmonicFret = n.Effect.Harmonic.Fret;
                                 if (n.Effect.Harmonic.Fret == 0) //older format..
                                 {
-                                    if (n.Effect.Harmonic.Type == 2) note.harmonicFret = ((ArtificialHarmonic)n.Effect.Harmonic).Pitch.ActualOvertone;
+                                    if (n.Effect.Harmonic.Type == 2) note.HarmonicFret = ((ArtificialHarmonic)n.Effect.Harmonic).Pitch.ActualOvertone;
                                 }
                                 switch (n.Effect.Harmonic.Type)
                                 {
-                                    case 1: note.harmonic = HarmonicTypes.natural; break;
-                                    case 2: note.harmonic = HarmonicTypes.artificial; break;
-                                    case 3: note.harmonic = HarmonicTypes.pinch; break;
-                                    case 4: note.harmonic = HarmonicTypes.tapped; break;
-                                    case 5: note.harmonic = HarmonicTypes.semi; break;
+                                    case 1: note.Harmonic = HarmonicTypes.Natural; break;
+                                    case 2: note.Harmonic = HarmonicTypes.Artificial; break;
+                                    case 3: note.Harmonic = HarmonicTypes.Pinch; break;
+                                    case 4: note.Harmonic = HarmonicTypes.Tapped; break;
+                                    case 5: note.Harmonic = HarmonicTypes.Semi; break;
 
                                     default:
-                                        note.harmonic = HarmonicTypes.natural;
+                                        note.Harmonic = HarmonicTypes.Natural;
                                         break;
                                 }
                             }
@@ -354,15 +374,15 @@ namespace MidiPro.Core.Native
                             {
                                 foreach (SlideTypes sl in n.Effect.Slides)
                                 {
-                                    note.slidesToNext = note.slidesToNext || sl == SlideTypes.ShiftSlideTo || sl == SlideTypes.LegatoSlideTo;
-                                    note.slideInFromAbove = note.slideInFromAbove || sl == SlideTypes.IntoFromAbove;
-                                    note.slideInFromBelow = note.slideInFromBelow || sl == SlideTypes.IntoFromBelow;
-                                    note.slideOutDownwards = note.slideOutDownwards || sl == SlideTypes.OutDownwards;
-                                    note.slideOutUpwards = note.slideOutUpwards || sl == SlideTypes.OutUpwards;
+                                    note.SlidesToNext = note.SlidesToNext || sl == SlideTypes.ShiftSlideTo || sl == SlideTypes.LegatoSlideTo;
+                                    note.SlideInFromAbove = note.SlideInFromAbove || sl == SlideTypes.IntoFromAbove;
+                                    note.SlideInFromBelow = note.SlideInFromBelow || sl == SlideTypes.IntoFromBelow;
+                                    note.SlideOutDownwards = note.SlideOutDownwards || sl == SlideTypes.OutDownwards;
+                                    note.SlideOutUpwards = note.SlideOutUpwards || sl == SlideTypes.OutUpwards;
                                 }
                             }
 
-                            if (n.Effect.Bend != null) note.bendPoints = getBendPoints(index + subIndex, flipDuration(b.Duration), n.Effect.Bend);
+                            if (n.Effect.Bend != null) note.BendPoints = GetBendPoints(index + subIndex, FlipDuration(b.Duration), n.Effect.Bend);
 
                             //Ties
 
@@ -375,21 +395,21 @@ namespace MidiPro.Core.Native
                                 dontAddNote = true;
                                 //Find if note can simply be added to previous note
 
-                                var last = last_notes[Math.Max(0, note.str - 1)];
+                                var last = lastNotes[Math.Max(0, note.Str - 1)];
 
 
 
                                 if (last != null)
                                 {
-                                    note.fret = last.fret; //For GP3 & GP4
-                                    if (last.harmonic != note.harmonic || last.harmonicFret != note.harmonicFret
+                                    note.Fret = last.Fret; //For GP3 & GP4
+                                    if (last.Harmonic != note.Harmonic || last.HarmonicFret != note.HarmonicFret
                                         ) dontAddNote = false;
 
                                     if (dontAddNote)
                                     {
-                                        note.connect = true;
-                                        last.duration += note.duration;
-                                        last.addBendPoints(note.bendPoints);
+                                        note.Connect = true;
+                                        last.Duration += note.Duration;
+                                        last.AddBendPoints(note.BendPoints);
 
                                     }
                                 }
@@ -398,54 +418,54 @@ namespace MidiPro.Core.Native
                             else // not a tie
                             {
 
-                                last_was_tie[Math.Max(0, note.str - 1)] = false;
+                                lastWasTie[Math.Max(0, note.Str - 1)] = false;
                             }
 
                             //Extra notes to replicate certain effects
 
 
                             //Triplet Feel
-                            if (!barMaster[measureIndex].tripletFeel.Equals("None"))
+                            if (!BarMaster[measureIndex].TripletFeel.Equals("None"))
                             {
-                                TripletFeels trip = barMaster[measureIndex].tripletFeel;
+                                TripletFeels trip = BarMaster[measureIndex].TripletFeel;
                                 //Check if at regular 8th or 16th beat position
-                                bool is_8th_pos = subIndex % 480 == 0;
-                                bool is_16th_pos = subIndex % 240 == 0;
-                                bool is_first = true; //first of note pair
-                                if (is_8th_pos) is_first = subIndex % 960 == 0;
-                                if (is_16th_pos) is_first = is_8th_pos;
-                                bool is_8th = b.Duration.Value == 8 && !b.Duration.IsDotted && !b.Duration.IsDoubleDotted && b.Duration.Tuplet.Enters == 1 && b.Duration.Tuplet.Times == 1;
-                                bool is_16th = b.Duration.Value == 16 && !b.Duration.IsDotted && !b.Duration.IsDoubleDotted && b.Duration.Tuplet.Enters == 1 && b.Duration.Tuplet.Times == 1;
+                                bool is8ThPos = subIndex % 480 == 0;
+                                bool is16ThPos = subIndex % 240 == 0;
+                                bool isFirst = true; //first of note pair
+                                if (is8ThPos) isFirst = subIndex % 960 == 0;
+                                if (is16ThPos) isFirst = is8ThPos;
+                                bool is8Th = b.Duration.Value == 8 && !b.Duration.IsDotted && !b.Duration.IsDoubleDotted && b.Duration.Tuplet.Enters == 1 && b.Duration.Tuplet.Times == 1;
+                                bool is16Th = b.Duration.Value == 16 && !b.Duration.IsDotted && !b.Duration.IsDoubleDotted && b.Duration.Tuplet.Enters == 1 && b.Duration.Tuplet.Times == 1;
 
-                                if ((trip == TripletFeels.Eigth && is_8th_pos && is_8th) || (trip == TripletFeels.Sixteenth && is_16th_pos && is_16th))
+                                if ((trip == TripletFeels.Eigth && is8ThPos && is8Th) || (trip == TripletFeels.Sixteenth && is16ThPos && is16Th))
                                 {
-                                    if (is_first) note.duration = (int)(note.duration * (4.0f / 3.0f));
-                                    if (!is_first)
+                                    if (isFirst) note.Duration = (int)(note.Duration * (4.0f / 3.0f));
+                                    if (!isFirst)
                                     {
-                                        note.duration = (int)(note.duration * (2.0f / 3.0f));
-                                        note.resizeValue *= (2.0f / 3.0f);
-                                        note.index += (int)(note.duration * (1.0f / 3.0f));
+                                        note.Duration = (int)(note.Duration * (2.0f / 3.0f));
+                                        note.ResizeValue *= (2.0f / 3.0f);
+                                        note.Index += (int)(note.Duration * (1.0f / 3.0f));
                                     }
 
                                 }
-                                if ((trip == TripletFeels.Dotted8Th && is_8th_pos && is_8th) || (trip == TripletFeels.Dotted16Th && is_16th_pos && is_16th))
+                                if ((trip == TripletFeels.Dotted8Th && is8ThPos && is8Th) || (trip == TripletFeels.Dotted16Th && is16ThPos && is16Th))
                                 {
-                                    if (is_first) note.duration = (int)(note.duration * 1.5f);
-                                    if (!is_first)
+                                    if (isFirst) note.Duration = (int)(note.Duration * 1.5f);
+                                    if (!isFirst)
                                     {
-                                        note.duration = (int)(note.duration * 0.5f);
-                                        note.resizeValue *= (0.5f);
-                                        note.index += (int)(note.duration * 0.5f);
+                                        note.Duration = (int)(note.Duration * 0.5f);
+                                        note.ResizeValue *= (0.5f);
+                                        note.Index += (int)(note.Duration * 0.5f);
                                     }
                                 }
-                                if ((trip == TripletFeels.Scottish8Th && is_8th_pos && is_8th) || (trip == TripletFeels.Scottish16Th && is_16th_pos && is_16th))
+                                if ((trip == TripletFeels.Scottish8Th && is8ThPos && is8Th) || (trip == TripletFeels.Scottish16Th && is16ThPos && is16Th))
                                 {
-                                    if (is_first) note.duration = (int)(note.duration * 0.5f);
-                                    if (!is_first)
+                                    if (isFirst) note.Duration = (int)(note.Duration * 0.5f);
+                                    if (!isFirst)
                                     {
-                                        note.duration = (int)(note.duration * 1.5f);
-                                        note.resizeValue *= (1.5f);
-                                        note.index -= (int)(note.duration * 0.5f);
+                                        note.Duration = (int)(note.Duration * 1.5f);
+                                        note.ResizeValue *= (1.5f);
+                                        note.Index -= (int)(note.Duration * 0.5f);
                                     }
                                 }
 
@@ -456,31 +476,31 @@ namespace MidiPro.Core.Native
                             //Tremolo Picking & Trill
                             if (n.Effect.TremoloPicking != null || n.Effect.Trill != null)
                             {
-                                int len = note.duration;
-                                if (n.Effect.TremoloPicking != null) len = flipDuration(n.Effect.TremoloPicking.Duration);
-                                if (n.Effect.Trill != null) len = flipDuration(n.Effect.Trill.Duration);
-                                int origDuration = note.duration;
-                                note.duration = len;
-                                note.resizeValue *= ((float)len / origDuration);
-                                int currentIndex = note.index + len;
+                                int len = note.Duration;
+                                if (n.Effect.TremoloPicking != null) len = FlipDuration(n.Effect.TremoloPicking.Duration);
+                                if (n.Effect.Trill != null) len = FlipDuration(n.Effect.Trill.Duration);
+                                int origDuration = note.Duration;
+                                note.Duration = len;
+                                note.ResizeValue *= ((float)len / origDuration);
+                                int currentIndex = note.Index + len;
 
-                                last_notes[Math.Max(0, note.str - 1)] = note;
+                                lastNotes[Math.Max(0, note.Str - 1)] = note;
                                 notes.Add(note);
                                 notesInMeasure++;
 
                                 dontAddNote = true; //Because we're doing it here already
                                 bool originalFret = false;
-                                int secondFret = note.fret;
+                                int secondFret = note.Fret;
 
-                                if (n.Effect.Trill != null) { secondFret = n.Effect.Trill.Fret - tuning[note.str - 1]; }
+                                if (n.Effect.Trill != null) { secondFret = n.Effect.Trill.Fret - tuning[note.Str - 1]; }
 
-                                while (currentIndex + len <= note.index + origDuration)
+                                while (currentIndex + len <= note.Index + origDuration)
                                 {
                                     Note newOne = new Note(note);
-                                    newOne.index = currentIndex;
-                                    if (!originalFret) newOne.fret = secondFret; //For trills
-                                    last_notes[Math.Max(0, note.str - 1)] = newOne;
-                                    if (n.Effect.Trill != null) newOne.isHammer = true;
+                                    newOne.Index = currentIndex;
+                                    if (!originalFret) newOne.Fret = secondFret; //For trills
+                                    lastNotes[Math.Max(0, note.Str - 1)] = newOne;
+                                    if (n.Effect.Trill != null) newOne.IsHammer = true;
                                     notes.Add(newOne);
                                     notesInMeasure++;
                                     currentIndex += len;
@@ -491,11 +511,11 @@ namespace MidiPro.Core.Native
 
 
                             //Grace Note
-                            if (rememberGrace && note.duration > graceLength)
+                            if (rememberGrace && note.Duration > graceLength)
                             {
-                                int orig = note.duration;
-                                note.duration -= graceLength;
-                                note.resizeValue *= ((float)note.duration / orig);
+                                int orig = note.Duration;
+                                note.Duration -= graceLength;
+                                note.ResizeValue *= ((float)note.Duration / orig);
                                 //subIndex -= graceLength;
                                 rememberedGrace = true;
                             }
@@ -507,22 +527,22 @@ namespace MidiPro.Core.Native
                                 { //GP3,4,5 format
 
                                     Note graceNote = new Note();
-                                    graceNote.index = note.index;
-                                    graceNote.fret = n.Effect.Grace.Fret;
-                                    graceNote.str = note.str;
+                                    graceNote.Index = note.Index;
+                                    graceNote.Fret = n.Effect.Grace.Fret;
+                                    graceNote.Str = note.Str;
                                     Duration dur = new Duration();
                                     dur.Value = n.Effect.Grace.Duration;
-                                    graceNote.duration = flipDuration(dur); //works at least for GP5
+                                    graceNote.Duration = FlipDuration(dur); //works at least for GP5
                                     if (isOnBeat)
                                     {
-                                        int orig = note.duration;
-                                        note.duration -= graceNote.duration;
-                                        note.index += graceNote.duration;
-                                        note.resizeValue *= ((float)note.duration / orig);
+                                        int orig = note.Duration;
+                                        note.Duration -= graceNote.Duration;
+                                        note.Index += graceNote.Duration;
+                                        note.ResizeValue *= ((float)note.Duration / orig);
                                     }
                                     else
                                     {
-                                        graceNote.index -= graceNote.duration;
+                                        graceNote.Index -= graceNote.Duration;
 
                                     }
 
@@ -537,14 +557,14 @@ namespace MidiPro.Core.Native
                                     if (isOnBeat) // shorten next note
                                     {
                                         rememberGrace = true;
-                                        graceLength = note.duration;
+                                        graceLength = note.Duration;
                                     }
                                     else //Change previous note
                                     {
                                         if (notes.Count > 0)
                                         {
-                                            note.index -= note.duration; //Can lead to negative indices. Midi should handle that
-                                            subtractSubindex = note.duration;
+                                            note.Index -= note.Duration; //Can lead to negative indices. Midi should handle that
+                                            subtractSubindex = note.Duration;
 
                                         }
                                     }
@@ -557,42 +577,42 @@ namespace MidiPro.Core.Native
                             //Dead Notes
                             if (n.Type == NoteTypes.Dead)
                             {
-                                int orig = note.duration;
-                                note.velocity = (int)(note.velocity * 0.9f); note.duration /= 6;
-                                note.resizeValue *= ((float)note.duration / orig);
+                                int orig = note.Duration;
+                                note.Velocity = (int)(note.Velocity * 0.9f); note.Duration /= 6;
+                                note.ResizeValue *= ((float)note.Duration / orig);
                             }
 
                             //Ghost Notes
                             if (n.Effect.PalmMute)
                             {
-                                int orig = note.duration;
-                                note.velocity = (int)(note.velocity * 0.7f); note.duration /= 2;
-                                note.resizeValue *= ((float)note.duration / orig);
+                                int orig = note.Duration;
+                                note.Velocity = (int)(note.Velocity * 0.7f); note.Duration /= 2;
+                                note.ResizeValue *= ((float)note.Duration / orig);
                             }
-                            if (n.Effect.GhostNote) { note.velocity = (int)(note.velocity * 0.8f); }
+                            if (n.Effect.GhostNote) { note.Velocity = (int)(note.Velocity * 0.8f); }
 
 
                             //Staccato, Accented, Heavy Accented
                             if (n.Effect.Staccato)
                             {
-                                int orig = note.duration;
-                                note.duration /= 2;
-                                note.resizeValue *= ((float)note.duration / orig);
+                                int orig = note.Duration;
+                                note.Duration /= 2;
+                                note.ResizeValue *= ((float)note.Duration / orig);
                             }
-                            if (n.Effect.AccentuatedNote) note.velocity = (int)(note.velocity * 1.2f);
-                            if (n.Effect.HeavyAccentuatedNote) note.velocity = (int)(note.velocity * 1.4f);
+                            if (n.Effect.AccentuatedNote) note.Velocity = (int)(note.Velocity * 1.2f);
+                            if (n.Effect.HeavyAccentuatedNote) note.Velocity = (int)(note.Velocity * 1.4f);
 
                             //Arpeggio / Brush
                             if (hasBrush)
                             {
-                                note.index = brushInit;
+                                note.Index = brushInit;
                                 brushInit += brushIncrease;
 
                             }
 
                             if (!dontAddNote)
                             {
-                                last_notes[Math.Max(0, note.str - 1)] = note;
+                                lastNotes[Math.Max(0, note.Str - 1)] = note;
                                 notes.Add(note);
                                 notesInMeasure++;
                             }
@@ -603,7 +623,7 @@ namespace MidiPro.Core.Native
 
                         subIndex -= subtractSubindex;
                         subtractSubindex = 0;
-                        subIndex += flipDuration(b.Duration);
+                        subIndex += FlipDuration(b.Duration);
 
                         //Sort brushed tones
                         if (hasBrush && brushDirection == BeatStrokeDirections.Up)
@@ -627,11 +647,11 @@ namespace MidiPro.Core.Native
                     }
                     break; //Consider only the first voice
                 }
-                int measureDuration = flipDuration(m.Header.TimeSignature.Denominator) * m.Header.TimeSignature.Numerator;
-                barMaster[measureIndex].duration = measureDuration;
-                barMaster[measureIndex].index = index;
+                int measureDuration = FlipDuration(m.Header.TimeSignature.Denominator) * m.Header.TimeSignature.Numerator;
+                BarMaster[measureIndex].Duration = measureDuration;
+                BarMaster[measureIndex].Index = index;
                 index += measureDuration;
-                notesInMeasures.Add(notesInMeasure);
+                _notesInMeasures.Add(notesInMeasure);
             }
 
 
@@ -640,7 +660,7 @@ namespace MidiPro.Core.Native
 
 
 
-        public int[] getTuning(List<GuitarString> strings)
+        public int[] GetTuning(List<GuitarString> strings)
         {
             int[] tuning = new int[strings.Count];
             for (int x = 0; x < tuning.Length; x++)
@@ -651,30 +671,30 @@ namespace MidiPro.Core.Native
             return tuning;
         }
 
-        public List<MasterBar> retrieveMasterBars(GpFile file)
+        public List<MasterBar> RetrieveMasterBars(GpFile file)
         {
             List<MasterBar> masterBars = new List<MasterBar>();
             foreach (MeasureHeader mh in file.MeasureHeaders)
             {
                 //(mh.timeSignature.denominator) * mh.timeSignature.numerator;
                 MasterBar mb = new MasterBar();
-                mb.time = mh.TimeSignature.Numerator + "/" + mh.TimeSignature.Denominator.Value;
-                mb.num = mh.TimeSignature.Numerator;
-                mb.den = mh.TimeSignature.Denominator.Value;
+                mb.Time = mh.TimeSignature.Numerator + "/" + mh.TimeSignature.Denominator.Value;
+                mb.Num = mh.TimeSignature.Numerator;
+                mb.Den = mh.TimeSignature.Denominator.Value;
                 string keyFull = "" + (int)mh.KeySignature;
                 if (!(keyFull.Length == 1))
                 {
-                    mb.keyType = int.Parse(keyFull.Substring(keyFull.Length - 1));
-                    mb.key = int.Parse(keyFull.Substring(0, keyFull.Length - 1));
+                    mb.KeyType = int.Parse(keyFull.Substring(keyFull.Length - 1));
+                    mb.Key = int.Parse(keyFull.Substring(0, keyFull.Length - 1));
                 }
                 else
                 {
-                    mb.key = 0;
-                    mb.keyType = int.Parse(keyFull);
+                    mb.Key = 0;
+                    mb.KeyType = int.Parse(keyFull);
                 }
-                mb.keyBoth = keyFull; //Useful for midiExport later
+                mb.KeyBoth = keyFull; //Useful for midiExport later
 
-                mb.tripletFeel = mh.TripletFeel;
+                mb.TripletFeel = mh.TripletFeel;
 
                 masterBars.Add(mb);
             }
@@ -682,7 +702,7 @@ namespace MidiPro.Core.Native
             return masterBars;
         }
 
-        public List<Tempo> retrieveTempos(GpFile file)
+        public List<Tempo> RetrieveTempos(GpFile file)
         {
             List<Tempo> tempos = new List<Tempo>();
             //Version < 4 -> look at Measure Headers, >= 4 look at mixtablechanges
@@ -693,20 +713,20 @@ namespace MidiPro.Core.Native
             {
                 //Get inital tempo from file header
                 Tempo init = new Tempo();
-                init.position = 0;
-                init.value = file.Tempo;
-                if (init.value != 0) tempos.Add(init);
+                init.Position = 0;
+                init.Value = file.Tempo;
+                if (init.Value != 0) tempos.Add(init);
 
                 int pos = 0;
                 float oldTempo = file.Tempo;
                 foreach (MeasureHeader mh in file.MeasureHeaders)
                 {
                     Tempo t = new Tempo();
-                    t.value = mh.Tempo.Value;
-                    t.position = pos;
-                    pos += flipDuration(mh.TimeSignature.Denominator) * mh.TimeSignature.Numerator;
-                    if (oldTempo != t.value) tempos.Add(t);
-                    oldTempo = t.value;
+                    t.Value = mh.Tempo.Value;
+                    t.Position = pos;
+                    pos += FlipDuration(mh.TimeSignature.Denominator) * mh.TimeSignature.Numerator;
+                    if (oldTempo != t.Value) tempos.Add(t);
+                    oldTempo = t.Value;
                 }
 
             }
@@ -716,9 +736,9 @@ namespace MidiPro.Core.Native
 
                 //Get inital tempo from file header
                 Tempo init = new Tempo();
-                init.position = 0;
-                init.value = file.Tempo;
-                if (init.value != 0) tempos.Add(init);
+                init.Position = 0;
+                init.Value = file.Tempo;
+                if (init.Value != 0) tempos.Add(init);
                 foreach (Measure m in file.Tracks[0].Measures)
                 {
                     int smallPos = 0; //inner measure position 
@@ -735,37 +755,37 @@ namespace MidiPro.Core.Native
                                 if (tempo != null)
                                 {
                                     Tempo t = new Tempo();
-                                    t.value = tempo.Value;
-                                    t.position = pos + smallPos;
+                                    t.Value = tempo.Value;
+                                    t.Position = pos + smallPos;
 
                                     tempos.Add(t);
                                 }
                             }
                         }
 
-                        smallPos += flipDuration(b.Duration);
+                        smallPos += FlipDuration(b.Duration);
                     }
-                    pos += flipDuration(m.Header.TimeSignature.Denominator) * m.Header.TimeSignature.Numerator;
+                    pos += FlipDuration(m.Header.TimeSignature.Denominator) * m.Header.TimeSignature.Numerator;
                 }
             }
 
             return tempos;
         }
 
-        private static int flipDuration(Duration d)
+        private static int FlipDuration(Duration d)
         {
-            int ticks_per_beat = 960;
+            int ticksPerBeat = 960;
             int result = 0;
             switch (d.Value)
             {
-                case 1: result += ticks_per_beat * 4; break;
-                case 2: result += ticks_per_beat * 2; break;
-                case 4: result += ticks_per_beat; break;
-                case 8: result += ticks_per_beat / 2; break;
-                case 16: result += ticks_per_beat / 4; break;
-                case 32: result += ticks_per_beat / 8; break;
-                case 64: result += ticks_per_beat / 16; break;
-                case 128: result += ticks_per_beat / 32; break;
+                case 1: result += ticksPerBeat * 4; break;
+                case 2: result += ticksPerBeat * 2; break;
+                case 4: result += ticksPerBeat; break;
+                case 8: result += ticksPerBeat / 2; break;
+                case 16: result += ticksPerBeat / 4; break;
+                case 32: result += ticksPerBeat / 8; break;
+                case 64: result += ticksPerBeat / 16; break;
+                case 128: result += ticksPerBeat / 32; break;
             }
             if (d.IsDotted) result = (int)(result * 1.5f);
             if (d.IsDoubleDotted) result = (int)(result * 1.75f);

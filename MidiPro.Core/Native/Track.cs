@@ -1,59 +1,80 @@
-﻿namespace MidiPro.Core.Native
+﻿using System;
+using System.Collections.Generic;
+using MidiPro.Core.Midi;
+using MidiPro.Core.Native.Enums;
+
+namespace MidiPro.Core.Native
 {
     public class Track
     {
-        public string name = "";
-        public int patch = 0;
-        public int port = 0;
-        public int channel = 0;
-        public int capo = 0;
-        public PlaybackState playbackState = PlaybackState.def;
-        public int[] tuning = new int[] { 40, 45, 50, 55, 59, 64 };
-        public List<Note> notes = new List<Note>();
-        public List<TremoloPoint> tremoloPoints = new List<TremoloPoint>();
-        private List<int[]> volumeChanges = new List<int[]>();
+        public string Name { get; set; }
+        public int Patch { get; set; }
+        public int Port { get; set; }
+        public int Channel { get; set; }
+        public int Capo { get; set; }
+        public PlaybackStates PlaybackState { get; set; }
+        public int[] Tuning { get; set; }
+        public List<Note> Notes { get; set; }
+        public List<TremoloPoint> TremoloPoints { get; set; }
 
 
-        public MidiExport.MidiTrack getMidi()
+        private List<int[]> _volumeChanges;
+
+
+        public Track()
         {
-            var midiTrack = new MidiExport.MidiTrack();
-            midiTrack.messages.Add(new MidiExport.MidiMessage("midi_port", new string[] { "" + port }, 0));
-            midiTrack.messages.Add(new MidiExport.MidiMessage("track_name", new string[] { name }, 0));
-            midiTrack.messages.Add(new MidiExport.MidiMessage("program_change", new string[] { "" + channel, "" + patch }, 0));
+            Name = string.Empty;
+            Patch = 0;
+            Port = 0;
+            Channel = 0;
+            Capo = 0;
+            PlaybackState = PlaybackStates.Def;
+            Tuning = new int[] { 40, 45, 50, 55, 59, 64 };
+            Notes = new List<Note>();
+            TremoloPoints = new List<TremoloPoint>();
+            _volumeChanges = new List<int[]>();
+        }
+
+        public MidiTrack GetMidi()
+        {
+            var midiTrack = new MidiTrack();
+            midiTrack.Messages.Add(new MidiMessage("midi_port", new string[] { "" + Port }, 0));
+            midiTrack.Messages.Add(new MidiMessage("track_name", new string[] { Name }, 0));
+            midiTrack.Messages.Add(new MidiMessage("program_change", new string[] { "" + Channel, "" + Patch }, 0));
 
 
             List<int[]> noteOffs = new List<int[]>();
             List<int[]> channelConnections = new List<int[]>(); //For bending and trembar: [original Channel, artificial Channel, index at when to delete artificial]
             List<BendingPlan> activeBendingPlans = new List<BendingPlan>();
             int currentIndex = 0;
-            Note _temp = new Note();
-            _temp.index = notes[notes.Count - 1].index + notes[notes.Count - 1].duration;
-            _temp.str = -2;
-            notes.Add(_temp);
+            Note temp = new Note();
+            temp.Index = Notes[Notes.Count - 1].Index + Notes[Notes.Count - 1].Duration;
+            temp.Str = -2;
+            Notes.Add(temp);
 
-            tremoloPoints = addDetailsToTremoloPoints(tremoloPoints, 60);
+            TremoloPoints = AddDetailsToTremoloPoints(TremoloPoints, 60);
 
             //var _notes = addSlidesToNotes(notes); //Adding slide notes here, as they should not appear as extra notes during playback
 
-            foreach (Note n in notes)
+            foreach (Note n in Notes)
             {
                 noteOffs.Sort((x, y) => x[0].CompareTo(y[0]));
 
 
 
                 //Check for active bendings in progress
-                List<BendPoint> currentBPs = findAndSortCurrentBendPoints(activeBendingPlans, n.index);
-                float _tremBarChange = 0.0f;
+                List<BendPoint> currentBPs = FindAndSortCurrentBendPoints(activeBendingPlans, n.Index);
+                float tremBarChange = 0.0f;
                 foreach (BendPoint bp in currentBPs)
                 {
                     //Check first if there is a note_off event happening in the meantime..
                     List<int[]> newNoteOffs = new List<int[]>();
                     foreach (int[] noteOff in noteOffs)
                     {
-                        if (noteOff[0] <= bp.index) //between last and this note, a note off event should occur
+                        if (noteOff[0] <= bp.Index) //between last and this note, a note off event should occur
                         {
-                            midiTrack.messages.Add(
-                                new MidiExport.MidiMessage("note_off",
+                            midiTrack.Messages.Add(
+                                new MidiMessage("note_off",
                                 new string[] { "" + noteOff[2], "" + noteOff[1], "0" }, noteOff[0] - currentIndex));
                             currentIndex = noteOff[0];
                         }
@@ -65,43 +86,43 @@
                     noteOffs = newNoteOffs;
 
                     //Check if there are active tremPoints to be adjusted for
-                    List<TremoloPoint> _newTremPoints = new List<TremoloPoint>();
+                    List<TremoloPoint> newTremPoints = new List<TremoloPoint>();
 
-                    foreach (TremoloPoint tp in tremoloPoints)
+                    foreach (TremoloPoint tp in TremoloPoints)
                     {
-                        if (tp.index <= bp.index) //between last and this note, a note off event should occur
+                        if (tp.Index <= bp.Index) //between last and this note, a note off event should occur
                         {
-                            _tremBarChange = tp.value;
+                            tremBarChange = tp.Value;
                         }
                         else
                         {
-                            _newTremPoints.Add(tp);
+                            newTremPoints.Add(tp);
                         }
                     }
-                    tremoloPoints = _newTremPoints;
+                    TremoloPoints = newTremPoints;
 
                     //Check if there are active volume changes
-                    List<int[]> _newVolumeChanges = new List<int[]>();
-                    foreach (int[] vc in volumeChanges)
+                    List<int[]> newVolumeChanges = new List<int[]>();
+                    foreach (int[] vc in _volumeChanges)
                     {
-                        if (vc[0] <= bp.index) //between last and this note, a volume change event should occur
+                        if (vc[0] <= bp.Index) //between last and this note, a volume change event should occur
                         { //channel control value
-                            midiTrack.messages.Add(
-                   new MidiExport.MidiMessage("control_change",
-                   new string[] { "" + bp.usedChannel, "7", "" + vc[1] }, vc[0] - currentIndex));
+                            midiTrack.Messages.Add(
+                   new MidiMessage("control_change",
+                   new string[] { "" + bp.UsedChannel, "7", "" + vc[1] }, vc[0] - currentIndex));
                             currentIndex = vc[0];
                         }
                         else
                         {
-                            _newVolumeChanges.Add(vc);
+                            newVolumeChanges.Add(vc);
                         }
                     }
-                    volumeChanges = _newVolumeChanges;
+                    _volumeChanges = newVolumeChanges;
 
-                    midiTrack.messages.Add(
-                   new MidiExport.MidiMessage("pitchwheel",
-                   new string[] { "" + bp.usedChannel, "" + (int)((bp.value + _tremBarChange) * 25.6f) }, bp.index - currentIndex));
-                    currentIndex = bp.index;
+                    midiTrack.Messages.Add(
+                   new MidiMessage("pitchwheel",
+                   new string[] { "" + bp.UsedChannel, "" + (int)((bp.Value + tremBarChange) * 25.6f) }, bp.Index - currentIndex));
+                    currentIndex = bp.Index;
                 }
 
                 //Delete no longer active Bending Plans
@@ -109,33 +130,33 @@
                 foreach (BendingPlan bpl in activeBendingPlans)
                 {
 
-                    BendingPlan newBPL = new BendingPlan(bpl.originalChannel, bpl.usedChannel, new List<BendPoint>());
-                    foreach (BendPoint bp in bpl.bendingPoints)
+                    BendingPlan newBpl = new BendingPlan(bpl.OriginalChannel, bpl.UsedChannel, new List<BendPoint>());
+                    foreach (BendPoint bp in bpl.BendingPoints)
                     {
-                        if (bp.index > n.index)
+                        if (bp.Index > n.Index)
                         {
-                            newBPL.bendingPoints.Add(bp);
+                            newBpl.BendingPoints.Add(bp);
                         }
                     }
-                    if (newBPL.bendingPoints.Count > 0)
+                    if (newBpl.BendingPoints.Count > 0)
                     {
-                        final.Add(newBPL);
+                        final.Add(newBpl);
                     }
                     else //That bending plan has finished
                     {
-                        midiTrack.messages.Add(new MidiExport.MidiMessage("pitchwheel", new string[] { "" + bpl.usedChannel, "-128" }, 0));
-                        midiTrack.messages.Add(new MidiExport.MidiMessage("control_change", new string[] { "" + bpl.usedChannel, "101", "127" }, 0));
-                        midiTrack.messages.Add(new MidiExport.MidiMessage("control_change", new string[] { "" + bpl.usedChannel, "10", "127" }, 0));
+                        midiTrack.Messages.Add(new MidiMessage("pitchwheel", new string[] { "" + bpl.UsedChannel, "-128" }, 0));
+                        midiTrack.Messages.Add(new MidiMessage("control_change", new string[] { "" + bpl.UsedChannel, "101", "127" }, 0));
+                        midiTrack.Messages.Add(new MidiMessage("control_change", new string[] { "" + bpl.UsedChannel, "10", "127" }, 0));
 
                         //Remove the channel from channelConnections
                         List<int[]> newChannelConnections = new List<int[]>();
                         foreach (int[] cc in channelConnections)
                         {
-                            if (cc[1] != bpl.usedChannel) newChannelConnections.Add(cc);
+                            if (cc[1] != bpl.UsedChannel) newChannelConnections.Add(cc);
                         }
                         channelConnections = newChannelConnections;
 
-                        NativeFormat.availableChannels[bpl.usedChannel] = true;
+                        NativeFormat.AvailableChannels[bpl.UsedChannel] = true;
                     }
                 }
 
@@ -144,139 +165,139 @@
 
 
 
-                var activeChannels = getActiveChannels(channelConnections);
-                List<TremoloPoint> newTremPoints = new List<TremoloPoint>();
-                foreach (TremoloPoint tp in tremoloPoints)
+                var activeChannels = GetActiveChannels(channelConnections);
+                List<TremoloPoint> _newTremPoints = new List<TremoloPoint>();
+                foreach (TremoloPoint tp in TremoloPoints)
                 {
-                    if (tp.index <= n.index) //between last and this note, a trembar event should occur
+                    if (tp.Index <= n.Index) //between last and this note, a trembar event should occur
                     {
-                        var value = tp.value * 25.6f;
+                        var value = tp.Value * 25.6f;
                         value = Math.Min(Math.Max(value, -8192), 8191);
                         foreach (int ch in activeChannels)
                         {
-                            midiTrack.messages.Add(
-                     new MidiExport.MidiMessage("pitchwheel",
-                     new string[] { "" + ch, "" + (int)(value) }, tp.index - currentIndex));
-                            currentIndex = tp.index;
+                            midiTrack.Messages.Add(
+                     new MidiMessage("pitchwheel",
+                     new string[] { "" + ch, "" + (int)(value) }, tp.Index - currentIndex));
+                            currentIndex = tp.Index;
                         }
                     }
                     else
                     {
-                        newTremPoints.Add(tp);
+                        _newTremPoints.Add(tp);
                     }
                 }
-                tremoloPoints = newTremPoints;
+                TremoloPoints = _newTremPoints;
 
 
                 //Check if there are active volume changes
-                List<int[]> newVolumeChanges = new List<int[]>();
-                foreach (int[] vc in volumeChanges)
+                List<int[]> _newVolumeChanges = new List<int[]>();
+                foreach (int[] vc in _volumeChanges)
                 {
-                    if (vc[0] <= n.index) //between last and this note, a volume change event should occur
+                    if (vc[0] <= n.Index) //between last and this note, a volume change event should occur
                     {
 
                         foreach (int ch in activeChannels)
                         {
-                            midiTrack.messages.Add(
-               new MidiExport.MidiMessage("control_change",
+                            midiTrack.Messages.Add(
+               new MidiMessage("control_change",
                new string[] { "" + ch, "7", "" + vc[1] }, vc[0] - currentIndex));
                             currentIndex = vc[0];
                         }
                     }
                     else
                     {
-                        newVolumeChanges.Add(vc);
+                        _newVolumeChanges.Add(vc);
                     }
                 }
-                volumeChanges = newVolumeChanges;
+                _volumeChanges = _newVolumeChanges;
 
 
-                List<int[]> temp = new List<int[]>();
+                List<int[]> myTemp = new List<int[]>();
                 foreach (int[] noteOff in noteOffs)
                 {
-                    if (noteOff[0] <= n.index) //between last and this note, a note off event should occur
+                    if (noteOff[0] <= n.Index) //between last and this note, a note off event should occur
                     {
-                        midiTrack.messages.Add(
-                            new MidiExport.MidiMessage("note_off",
+                        midiTrack.Messages.Add(
+                            new MidiMessage("note_off",
                             new string[] { "" + noteOff[2], "" + noteOff[1], "0" }, noteOff[0] - currentIndex));
                         currentIndex = noteOff[0];
                     }
                     else
                     {
-                        temp.Add(noteOff);
+                        myTemp.Add(noteOff);
                     }
                 }
-                noteOffs = temp;
+                noteOffs = myTemp;
 
-                int velocity = n.velocity;
+                int velocity = n.Velocity;
                 int note;
 
-                if (n.str == -2) break; //Last round
+                if (n.Str == -2) break; //Last round
 
-                if (n.str - 1 < 0) Debug.Log("String was -1");
-                if (n.str - 1 >= tuning.Length && tuning.Length != 0) Debug.Log("String was higher than string amount (" + n.str + ")");
-                if (tuning.Length > 0) note = tuning[n.str - 1] + capo + n.fret;
+                //if (n.str - 1 < 0) Debug.Log("String was -1");
+                //if (n.str - 1 >= tuning.Length && tuning.Length != 0) Debug.Log("String was higher than string amount (" + n.str + ")");
+                if (Tuning.Length > 0) note = Tuning[n.Str - 1] + Capo + n.Fret;
                 else
                 {
-                    note = capo + n.fret;
+                    note = Capo + n.Fret;
                 }
-                if (n.harmonic != HarmonicType.none) //Has Harmonics
+                if (n.Harmonic != HarmonicTypes.None) //Has Harmonics
                 {
-                    int harmonicNote = getHarmonic(tuning[n.str - 1], n.fret, capo, n.harmonicFret, n.harmonic);
+                    int harmonicNote = GetHarmonic(Tuning[n.Str - 1], n.Fret, Capo, n.HarmonicFret, n.Harmonic);
                     note = harmonicNote;
                 }
 
-                int noteChannel = channel;
+                int noteChannel = Channel;
 
-                if (n.bendPoints.Count > 0) //Has Bending
+                if (n.BendPoints.Count > 0) //Has Bending
                 {
-                    int usedChannel = tryToFindChannel();
-                    if (usedChannel == -1) usedChannel = channel;
-                    NativeFormat.availableChannels[usedChannel] = false;
-                    channelConnections.Add(new int[] { channel, usedChannel, n.index + n.duration });
-                    midiTrack.messages.Add(new MidiExport.MidiMessage("program_change", new string[] { "" + usedChannel, "" + patch }, n.index - currentIndex));
+                    int usedChannel = TryToFindChannel();
+                    if (usedChannel == -1) usedChannel = Channel;
+                    NativeFormat.AvailableChannels[usedChannel] = false;
+                    channelConnections.Add(new int[] { Channel, usedChannel, n.Index + n.Duration });
+                    midiTrack.Messages.Add(new MidiMessage("program_change", new string[] { "" + usedChannel, "" + Patch }, n.Index - currentIndex));
                     noteChannel = usedChannel;
-                    currentIndex = n.index;
-                    activeBendingPlans.Add(createBendingPlan(n.bendPoints, channel, usedChannel, n.duration, n.index, n.resizeValue, n.isVibrato));
+                    currentIndex = n.Index;
+                    activeBendingPlans.Add(CreateBendingPlan(n.BendPoints, Channel, usedChannel, n.Duration, n.Index, n.ResizeValue, n.IsVibrato));
                 }
 
-                if (n.isVibrato && n.bendPoints.Count == 0) //Is Vibrato & No Bending
+                if (n.IsVibrato && n.BendPoints.Count == 0) //Is Vibrato & No Bending
                 {
-                    int usedChannel = channel;
-                    activeBendingPlans.Add(createBendingPlan(n.bendPoints, channel, usedChannel, n.duration, n.index, n.resizeValue, true));
+                    int usedChannel = Channel;
+                    activeBendingPlans.Add(CreateBendingPlan(n.BendPoints, Channel, usedChannel, n.Duration, n.Index, n.ResizeValue, true));
 
                 }
 
-                if (n.fading != Fading.none) //Fading
+                if (n.Fading != Fadings.None) //Fading
                 {
-                    volumeChanges = createVolumeChanges(n.index, n.duration, n.velocity, n.fading);
+                    _volumeChanges = CreateVolumeChanges(n.Index, n.Duration, n.Velocity, n.Fading);
                 }
 
-                midiTrack.messages.Add(new MidiExport.MidiMessage("note_on", new string[] { "" + noteChannel, "" + note, "" + n.velocity }, n.index - currentIndex));
-                currentIndex = n.index;
+                midiTrack.Messages.Add(new MidiMessage("note_on", new string[] { "" + noteChannel, "" + note, "" + n.Velocity }, n.Index - currentIndex));
+                currentIndex = n.Index;
 
-                if (n.bendPoints.Count > 0) //Has Bending cont.
+                if (n.BendPoints.Count > 0) //Has Bending cont.
                 {
-                    midiTrack.messages.Add(new MidiExport.MidiMessage("control_change", new string[] { "" + noteChannel, "101", "0" }, 0));
-                    midiTrack.messages.Add(new MidiExport.MidiMessage("control_change", new string[] { "" + noteChannel, "100", "0" }, 0));
-                    midiTrack.messages.Add(new MidiExport.MidiMessage("control_change", new string[] { "" + noteChannel, "6", "6" }, 0));
-                    midiTrack.messages.Add(new MidiExport.MidiMessage("control_change", new string[] { "" + noteChannel, "38", "0" }, 0));
+                    midiTrack.Messages.Add(new MidiMessage("control_change", new string[] { "" + noteChannel, "101", "0" }, 0));
+                    midiTrack.Messages.Add(new MidiMessage("control_change", new string[] { "" + noteChannel, "100", "0" }, 0));
+                    midiTrack.Messages.Add(new MidiMessage("control_change", new string[] { "" + noteChannel, "6", "6" }, 0));
+                    midiTrack.Messages.Add(new MidiMessage("control_change", new string[] { "" + noteChannel, "38", "0" }, 0));
 
 
                 }
 
-                noteOffs.Add(new int[] { n.index + n.duration, note, noteChannel });
+                noteOffs.Add(new int[] { n.Index + n.Duration, note, noteChannel });
 
             }
 
 
 
 
-            midiTrack.messages.Add(new MidiExport.MidiMessage("end_of_track", new string[] { }, 0));
+            midiTrack.Messages.Add(new MidiMessage("end_of_track", new string[] { }, 0));
             return midiTrack;
         }
 
-        private List<Note> addSlidesToNotes(List<Note> notes)
+        private List<Note> AddSlidesToNotes(List<Note> notes)
         {
             List<Note> ret = new List<Note>();
             int index = -1;
@@ -285,36 +306,36 @@
                 index++;
                 bool skipWrite = false;
 
-                if ((n.slideInFromBelow && n.str > 1) || n.slideInFromAbove)
+                if ((n.SlideInFromBelow && n.Str > 1) || n.SlideInFromAbove)
                 {
-                    int myFret = n.fret;
-                    int start = n.slideInFromAbove ? myFret + 4 : Math.Max(1, myFret - 4);
-                    int beginIndex = n.index - 960 / 4; //16th before
+                    int myFret = n.Fret;
+                    int start = n.SlideInFromAbove ? myFret + 4 : Math.Max(1, myFret - 4);
+                    int beginIndex = n.Index - 960 / 4; //16th before
                     int lengthEach = (960 / 4) / Math.Abs(myFret - start);
                     for (int x = 0; x < Math.Abs(myFret - start); x++)
                     {
                         Note newOne = new Note(n);
-                        newOne.duration = lengthEach;
-                        newOne.index = beginIndex + x * lengthEach;
-                        newOne.fret = start + (n.slideInFromAbove ? -x : +x);
+                        newOne.Duration = lengthEach;
+                        newOne.Index = beginIndex + x * lengthEach;
+                        newOne.Fret = start + (n.SlideInFromAbove ? -x : +x);
                         ret.Add(newOne);
                     }
                 }
 
-                if ((n.slideOutDownwards && n.str > 1) || n.slideOutUpwards)
+                if ((n.SlideOutDownwards && n.Str > 1) || n.SlideOutUpwards)
                 {
-                    int myFret = n.fret;
-                    int end = n.slideOutUpwards ? myFret + 4 : Math.Max(1, myFret - 4);
-                    int beginIndex = (n.index + n.duration) - 960 / 4; //16th before
+                    int myFret = n.Fret;
+                    int end = n.SlideOutUpwards ? myFret + 4 : Math.Max(1, myFret - 4);
+                    int beginIndex = (n.Index + n.Duration) - 960 / 4; //16th before
                     int lengthEach = (960 / 4) / Math.Abs(myFret - end);
-                    n.duration -= 960 / 4;
+                    n.Duration -= 960 / 4;
                     ret.Add(n); skipWrite = true;
                     for (int x = 0; x < Math.Abs(myFret - end); x++)
                     {
                         Note newOne = new Note(n);
-                        newOne.duration = lengthEach;
-                        newOne.index = beginIndex + x * lengthEach;
-                        newOne.fret = myFret + (n.slideOutDownwards ? -x : +x);
+                        newOne.Duration = lengthEach;
+                        newOne.Index = beginIndex + x * lengthEach;
+                        newOne.Fret = myFret + (n.SlideOutDownwards ? -x : +x);
                         ret.Add(newOne);
                     }
                 }
@@ -358,15 +379,15 @@
             return ret;
         }
 
-        private List<int[]> createVolumeChanges(int index, int duration, int velocity, Fading fading)
+        private List<int[]> CreateVolumeChanges(int index, int duration, int velocity, Fadings fading)
         {
             int segments = 20;
             List<int[]> changes = new List<int[]>();
-            if (fading == Fading.fadeIn || fading == Fading.fadeOut)
+            if (fading == Fadings.FadeIn || fading == Fadings.FadeOut)
             {
                 int step = velocity / segments;
-                int val = fading == Fading.fadeIn ? 0 : velocity;
-                if (fading == Fading.fadeOut) step = (int)(-step * 1.25f);
+                int val = fading == Fadings.FadeIn ? 0 : velocity;
+                if (fading == Fadings.FadeOut) step = (int)(-step * 1.25f);
 
                 for (int x = index; x < index + duration; x += (duration / segments))
                 {
@@ -376,7 +397,7 @@
 
             }
 
-            if (fading == Fading.volumeSwell)
+            if (fading == Fadings.VolumeSwell)
             {
                 int step = (int)(velocity / (segments * 0.8f));
                 int val = 0;
@@ -396,21 +417,21 @@
             return changes;
         }
 
-        private List<int> getActiveChannels(List<int[]> channelConnections)
+        private List<int> GetActiveChannels(List<int[]> channelConnections)
         {
-            List<int> ret_val = new List<int>();
-            ret_val.Add(channel);
+            List<int> retVal = new List<int>();
+            retVal.Add(Channel);
             foreach (int[] cc in channelConnections)
             {
-                ret_val.Add(cc[1]);
+                retVal.Add(cc[1]);
             }
-            return ret_val;
+            return retVal;
         }
 
-        public int tryToFindChannel()
+        public int TryToFindChannel()
         {
             int cnt = 0;
-            foreach (bool available in NativeFormat.availableChannels)
+            foreach (bool available in NativeFormat.AvailableChannels)
             {
                 if (available) return cnt;
                 cnt++;
@@ -418,12 +439,12 @@
             return -1;
         }
 
-        public int getHarmonic(int baseTone, int fret, int capo, float harmonicFret, HarmonicType type)
+        public int GetHarmonic(int baseTone, int fret, int capo, float harmonicFret, HarmonicTypes type)
         {
             int val = 0;
             //Capo, base tone and fret (if not natural harmonic) shift the harmonics simply
             val = val + baseTone + capo;
-            if (type != HarmonicType.natural)
+            if (type != HarmonicTypes.Natural)
             {
                 val += (int)Math.Round(harmonicFret);
             }
@@ -451,53 +472,53 @@
         }
 
 
-        public List<BendPoint> findAndSortCurrentBendPoints(List<BendingPlan> activeBendingPlans, int index)
+        public List<BendPoint> FindAndSortCurrentBendPoints(List<BendingPlan> activeBendingPlans, int index)
         {
             List<BendPoint> bps = new List<BendPoint>();
             foreach (BendingPlan bpl in activeBendingPlans)
             {
-                foreach (BendPoint bp in bpl.bendingPoints)
+                foreach (BendPoint bp in bpl.BendingPoints)
                 {
-                    if (bp.index <= index)
+                    if (bp.Index <= index)
                     {
-                        bp.usedChannel = bpl.usedChannel;
+                        bp.UsedChannel = bpl.UsedChannel;
                         bps.Add(bp);
                     }
                 }
             }
-            bps.Sort((x, y) => x.index.CompareTo(y.index));
+            bps.Sort((x, y) => x.Index.CompareTo(y.Index));
 
             return bps;
         }
 
-        public List<TremoloPoint> addDetailsToTremoloPoints(List<TremoloPoint> tremoloPoints, int maxDistance)
+        public List<TremoloPoint> AddDetailsToTremoloPoints(List<TremoloPoint> tremoloPoints, int maxDistance)
         {
             List<TremoloPoint> tremPoints = new List<TremoloPoint>();
             float oldValue = 0.0f;
             int oldIndex = 0;
             foreach (TremoloPoint tp in tremoloPoints)
             {
-                if ((tp.index - oldIndex) > maxDistance && !(oldValue == 0.0f && tp.value == 0.0f))
+                if ((tp.Index - oldIndex) > maxDistance && !(oldValue == 0.0f && tp.Value == 0.0f))
                 {
                     //Add in-between points
-                    for (int x = oldIndex + maxDistance; x < tp.index; x += maxDistance)
+                    for (int x = oldIndex + maxDistance; x < tp.Index; x += maxDistance)
                     {
-                        float value = oldValue + (tp.value - oldValue) * (((float)x - oldIndex) / ((float)tp.index - oldIndex));
+                        float value = oldValue + (tp.Value - oldValue) * (((float)x - oldIndex) / ((float)tp.Index - oldIndex));
                         tremPoints.Add(new TremoloPoint(value, x));
 
                     }
                 }
                 tremPoints.Add(tp);
 
-                oldValue = tp.value;
-                oldIndex = tp.index;
+                oldValue = tp.Value;
+                oldIndex = tp.Index;
             }
 
 
             return tremPoints;
         }
 
-        public BendingPlan createBendingPlan(List<BendPoint> bendPoints, int originalChannel, int usedChannel, int duration, int index, float resize, bool isVibrato)
+        public BendingPlan CreateBendingPlan(List<BendPoint> bendPoints, int originalChannel, int usedChannel, int duration, int index, float resize, bool isVibrato)
         {
             int maxDistance = duration / 10; //After this there should be a pitchwheel event
             if (isVibrato) maxDistance = Math.Min(maxDistance, 60);
@@ -516,12 +537,12 @@
             //Resize the points according to (changed) note duration
             foreach (BendPoint bp in bendPoints)
             {
-                bp.index = (int)(index + ((bp.index - index) * resize));
-                bp.usedChannel = usedChannel;
+                bp.Index = (int)(index + ((bp.Index - index) * resize));
+                bp.UsedChannel = usedChannel;
             }
 
-            int old_pos = index;
-            float old_value = 0.0f;
+            int oldPos = index;
+            float oldValue = 0.0f;
             bool start = true;
             int vibratoSize = 0;
             int vibratoChange = 0;
@@ -530,34 +551,34 @@
             int vibrato = 0;
             foreach (BendPoint bp in bendPoints)
             {
-                if ((bp.index - old_pos) > maxDistance)
+                if ((bp.Index - oldPos) > maxDistance)
                 {
                     //Add in-between points
-                    for (int x = old_pos + maxDistance; x < bp.index; x += maxDistance)
+                    for (int x = oldPos + maxDistance; x < bp.Index; x += maxDistance)
                     {
-                        float value = old_value + (bp.value - old_value) * (((float)x - old_pos) / ((float)bp.index - old_pos));
+                        float value = oldValue + (bp.Value - oldValue) * (((float)x - oldPos) / ((float)bp.Index - oldPos));
                         bendingPoints.Add(new BendPoint(value + vibrato, x));
                         if (isVibrato && Math.Abs(vibrato) == vibratoSize) vibratoChange = -vibratoChange;
                         vibrato += vibratoChange;
 
                     }
                 }
-                if (start || bp.index != old_pos)
+                if (start || bp.Index != oldPos)
                 {
-                    if (isVibrato) bp.value += vibrato;
+                    if (isVibrato) bp.Value += vibrato;
                     bendingPoints.Add(bp);
 
                 }
-                old_pos = bp.index;
-                old_value = bp.value;
-                if ((start || bp.index != old_pos) && isVibrato) old_value -= vibrato; //Add back, so not to be influenced by it
+                oldPos = bp.Index;
+                oldValue = bp.Value;
+                if ((start || bp.Index != oldPos) && isVibrato) oldValue -= vibrato; //Add back, so not to be influenced by it
                 start = false;
                 if (isVibrato && Math.Abs(vibrato) == vibratoSize) vibratoChange = -vibratoChange;
                 vibrato += vibratoChange;
             }
-            if (Math.Abs(index + duration - old_pos) > maxDistance)
+            if (Math.Abs(index + duration - oldPos) > maxDistance)
             {
-                bendingPoints.Add(new BendPoint(old_value, index + duration));
+                bendingPoints.Add(new BendPoint(oldValue, index + duration));
             }
 
             return new BendingPlan(originalChannel, usedChannel, bendingPoints);

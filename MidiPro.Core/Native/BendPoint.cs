@@ -2,14 +2,22 @@
 {
     public class BendPoint
     {
-        public float value = 0;
-        public int index = 0; //also global index of midi
-        public int usedChannel = 0; //After being part of BendingPlan
-        public BendPoint(float value, int index)
+        public float Value { get; set; }
+        public int Index { get; set; } //also global index of midi
+        public int UsedChannel { get; set; } //After being part of BendingPlan
+
+
+        public BendPoint()
         {
-            this.value = value;
-            this.index = index;
+            Value = 0;
+            Index = 0;
+            UsedChannel = 0;
         }
-        public BendPoint() { }
+
+        public BendPoint(float value, int index) : this()
+        {
+            this.Value = value;
+            this.Index = index;
+        }
     }
 }

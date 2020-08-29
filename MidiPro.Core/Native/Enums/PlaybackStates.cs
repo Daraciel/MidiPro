@@ -2,6 +2,8 @@
 {
     public enum PlaybackStates
     {
-        def = 0, mute = 1, solo = 2
+        Def = 0, 
+        Mute = 1, 
+        Solo = 2
     }
 }

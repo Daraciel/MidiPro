@@ -2,6 +2,9 @@
 {
     public enum Fadings
     {
-        none = 0, fadeIn = 1, fadeOut = 2, volumeSwell = 3
+        None = 0, 
+        FadeIn = 1, 
+        FadeOut = 2, 
+        VolumeSwell = 3
     }
 }

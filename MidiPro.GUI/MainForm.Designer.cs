@@ -35,6 +35,8 @@
             this.tbMidiFilename = new System.Windows.Forms.TextBox();
             this.btnConvert = new System.Windows.Forms.Button();
             this.ofdGPFile = new System.Windows.Forms.OpenFileDialog();
+            this.btnReadPgxFile = new System.Windows.Forms.Button();
+            this.nfSong = new MidiPro.GUI.NativeFormatUc();
             this.SuspendLayout();
             // 
             // tbGpFilename
@@ -49,7 +51,7 @@
             this.label1.AutoSize = true;
             this.label1.Location = new System.Drawing.Point(12, 15);
             this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(77, 15);
+            this.label1.Size = new System.Drawing.Size(68, 13);
             this.label1.TabIndex = 1;
             this.label1.Text = "Fichero GPx:";
             // 
@@ -68,7 +70,7 @@
             this.label2.AutoSize = true;
             this.label2.Location = new System.Drawing.Point(12, 41);
             this.label2.Name = "label2";
-            this.label2.Size = new System.Drawing.Size(80, 15);
+            this.label2.Size = new System.Drawing.Size(71, 13);
             this.label2.TabIndex = 4;
             this.label2.Text = "Fichero MIDI:";
             // 
@@ -96,11 +98,33 @@
             this.ofdGPFile.FileName = "GuitarProFile";
             this.ofdGPFile.Filter = "Archivos GP3|*.gp3|Archivos GP4|*.gp4";
             // 
+            // btnReadPgxFile
+            // 
+            this.btnReadPgxFile.Location = new System.Drawing.Point(638, 9);
+            this.btnReadPgxFile.Name = "btnReadPgxFile";
+            this.btnReadPgxFile.Size = new System.Drawing.Size(75, 23);
+            this.btnReadPgxFile.TabIndex = 6;
+            this.btnReadPgxFile.Text = "Leer";
+            this.btnReadPgxFile.UseVisualStyleBackColor = true;
+            this.btnReadPgxFile.Click += new System.EventHandler(this.btnReadPgxFile_Click);
+            // 
+            // nfSong
+            // 
+            this.nfSong.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.nfSong.Location = new System.Drawing.Point(12, 93);
+            this.nfSong.Name = "nfSong";
+            this.nfSong.Size = new System.Drawing.Size(750, 383);
+            this.nfSong.TabIndex = 7;
+            // 
             // MainForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(638, 208);
+            this.ClientSize = new System.Drawing.Size(774, 488);
+            this.Controls.Add(this.nfSong);
+            this.Controls.Add(this.btnReadPgxFile);
             this.Controls.Add(this.btnConvert);
             this.Controls.Add(this.label2);
             this.Controls.Add(this.tbMidiFilename);
@@ -125,6 +149,8 @@
         private System.Windows.Forms.TextBox tbMidiFilename;
         private System.Windows.Forms.Button btnConvert;
         private System.Windows.Forms.OpenFileDialog ofdGPFile;
+        private System.Windows.Forms.Button btnReadPgxFile;
+        private NativeFormatUc nfSong;
     }
 }
 

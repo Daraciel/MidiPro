@@ -5,185 +5,191 @@ namespace MidiPro.Core.Midi
 {
     public class MidiMessage
     {
-        public string type = "";
-        public int time = 0;
-        public bool is_meta = false;
-        private byte code = 0x00;
-        //MetaMessages:
-        //#############
-        //sequence_number 0x00
-        public int number = 0;
-        //text 0x01
-        public string text = "";
-        //copyright 0x02 -> text
-        //track_name 0x03
-        public string name = "";
-        //instrument_name 0x04 -> track_name
-        //lyrics 0x05 -> text
-        //marker 0x06 -> text
-        //cue_marker 0x07 -> text
-        //device_name 0x08 -> track_name
-        //channel_prefix 0x20
-        public int channel = 0;
-        //midi_port 0x21
-        public int port = 0;
-        //end_of_track 0x2f
-        //set_tempo 0x51
-        public int tempo = 500000;
-        //smpte_offset 0x54 (Ignore)
-        //public int frame_rate = 24; public int hours = 0; public int minutes = 0; public int seconds = 0; public int frames = 0; public int sub_frames = 0;
-        //time_signature 0x58
-        public int numerator = 4; public int denominator = 2; public int clocks_per_click = 24; public int notated_32nd_notes_per_beat = 8;
-        //key_signature 0x59
-        public int key = 0; bool is_major = true;
+        public string Type { get; set; }
+        public int Time { get; set; }
+        public bool IsMeta { get; set; }
+        public int Number { get; set; }
+        public string Text { get; set; }
+        public string Name { get; set; }
+        public int Channel { get; set; }
+        public int Port { get; set; }
+        public int Tempo { get; set; }
+        public int Numerator { get; set; }
+        public int Denominator { get; set; }
+        public int ClocksPerClick { get; set; }
+        public int Notated32NdNotesPerBeat { get; set; }
+        public int Key { get; set; }
 
-        //Messages:
-        //#########
-        //note_off 0x80 (channel, note, velocity)
-        public int note = 0; public int velocity = 0;
-        //note_on 0x90 (channel, note, velocity)
-        //polytouch 0xa0 (channel, note, value)
-        public int value = 0;
-        //control_change 0xb0 (channel, control, value)
-        public int control = 0;
-        //program_change 0xc0 (channel, program)
-        public int program = 0;
-        //aftertouch 0xd0 (channel, value)
-        //pitchwheel 0xe0 (channel, pitch)
-        public int pitch = 0;
-        //sysex 0xf0 (data)
-        public byte[] data;
+        public int Note { get; set; }
+        public int Velocity { get; set; }
+        public int Value { get; set; }
+        public int Control { get; set; }
+        public int Program { get; set; }
+        public int Pitch { get; set; }
+        public byte[] Data { get; set; }
+
+
+        private byte _code;
+        private bool _isMajor;
+
+        private MidiMessage()
+        {
+            Type = string.Empty;
+            Time = 0;
+            IsMeta = false;
+            Number = 0;
+            Text = string.Empty;
+            Name = string.Empty;
+            Channel = 0;
+            Port = 0;
+            Tempo = 500000;
+            Numerator = 4;
+            Denominator = 2;
+            ClocksPerClick = 24;
+            Notated32NdNotesPerBeat = 8;
+            Key = 0;
+            Note = 0;
+            Velocity = 0;
+            Value = 0;
+            Control = 0;
+            Program = 0;
+            Pitch = 0;
+            Data = null;
+
+            _code = 0x00;
+            _isMajor = true;
+        }
 
         //Others not needed..
-        public MidiMessage(string type, string[] args, int time, byte[] data = null)
+        public MidiMessage(string type, string[] args, int time, byte[] data = null) :this()
         {
-            is_meta = false;
-            this.type = type;
-            this.time = time;
+            IsMeta = false;
+            this.Type = type;
+            this.Time = time;
 
             //Meta Messages
-            if (type.Equals("sequence_number")) { is_meta = true; code = 0x00; number = int.Parse(args[0]); }
+            if (type.Equals("sequence_number")) { IsMeta = true; _code = 0x00; Number = int.Parse(args[0]); }
             if (type.Equals("text") || type.Equals("copyright") || type.Equals("lyrics") || type.Equals("marker") || type.Equals("cue_marker"))
             {
-                is_meta = true;
-                text = args[0];
+                IsMeta = true;
+                Text = args[0];
             }
-            if (type.Equals("text")) code = 0x01;
-            if (type.Equals("copyright")) code = 0x02;
-            if (type.Equals("lyrics")) code = 0x05;
-            if (type.Equals("marker")) code = 0x06;
-            if (type.Equals("cue_marker")) code = 0x07;
+            if (type.Equals("text")) _code = 0x01;
+            if (type.Equals("copyright")) _code = 0x02;
+            if (type.Equals("lyrics")) _code = 0x05;
+            if (type.Equals("marker")) _code = 0x06;
+            if (type.Equals("cue_marker")) _code = 0x07;
 
             if (type.Equals("track_name") || type.Equals("instrument_name") || type.Equals("device_name"))
             {
-                is_meta = true; code = 0x03;
-                name = args[0];
+                IsMeta = true; _code = 0x03;
+                Name = args[0];
             }
-            if (type.Equals("instrument_name")) code = 0x04;
-            if (type.Equals("device_name")) code = 0x08;
+            if (type.Equals("instrument_name")) _code = 0x04;
+            if (type.Equals("device_name")) _code = 0x08;
 
-            if (type.Equals("channel_prefix")) { code = 0x20; channel = int.Parse(args[0]); is_meta = true; }
-            if (type.Equals("midi_port")) { code = 0x21; port = int.Parse(args[0]); is_meta = true; }
-            if (type.Equals("end_of_track")) { code = 0x2f; is_meta = true; }
-            if (type.Equals("set_tempo")) { code = 0x51; tempo = int.Parse(args[0]); is_meta = true; }
+            if (type.Equals("channel_prefix")) { _code = 0x20; Channel = int.Parse(args[0]); IsMeta = true; }
+            if (type.Equals("midi_port")) { _code = 0x21; Port = int.Parse(args[0]); IsMeta = true; }
+            if (type.Equals("end_of_track")) { _code = 0x2f; IsMeta = true; }
+            if (type.Equals("set_tempo")) { _code = 0x51; Tempo = int.Parse(args[0]); IsMeta = true; }
 
             if (type.Equals("time_signature"))
             {
-                is_meta = true; code = 0x58;
-                numerator = int.Parse(args[0]);  //4
-                denominator = int.Parse(args[1]); //4 
-                clocks_per_click = int.Parse(args[2]); //24
-                notated_32nd_notes_per_beat = int.Parse(args[3]); //8
+                IsMeta = true; _code = 0x58;
+                Numerator = int.Parse(args[0]);  //4
+                Denominator = int.Parse(args[1]); //4 
+                ClocksPerClick = int.Parse(args[2]); //24
+                Notated32NdNotesPerBeat = int.Parse(args[3]); //8
             }
 
             if (type.Equals("key_signature"))
             {
-                is_meta = true; code = 0x59;
-                key = int.Parse(args[0]);
-                is_major = args[1].Equals("0"); //"0" or "1"
+                IsMeta = true; _code = 0x59;
+                Key = int.Parse(args[0]);
+                _isMajor = args[1].Equals("0"); //"0" or "1"
             }
 
 
             //Normal Messages
-            if (type.Equals("note_off")) { code = 0x80; channel = int.Parse(args[0]); note = int.Parse(args[1]); velocity = int.Parse(args[2]); }
-            if (type.Equals("note_on")) { code = 0x90; channel = int.Parse(args[0]); note = int.Parse(args[1]); velocity = int.Parse(args[2]); }
-            if (type.Equals("polytouch")) { code = 0xa0; channel = int.Parse(args[0]); note = int.Parse(args[1]); value = int.Parse(args[2]); }
-            if (type.Equals("control_change")) { code = 0xb0; channel = int.Parse(args[0]); control = int.Parse(args[1]); value = int.Parse(args[2]); }
-            if (type.Equals("program_change")) { code = 0xc0; channel = int.Parse(args[0]); program = int.Parse(args[1]); }
-            if (type.Equals("aftertouch")) { code = 0xd0; channel = int.Parse(args[0]); value = int.Parse(args[1]); }
-            if (type.Equals("pitchwheel")) { code = 0xe0; channel = int.Parse(args[0]); pitch = int.Parse(args[1]); }
-            if (type.Equals("sysex")) { code = 0xf0; this.data = data; }
+            if (type.Equals("note_off")) { _code = 0x80; Channel = int.Parse(args[0]); Note = int.Parse(args[1]); Velocity = int.Parse(args[2]); }
+            if (type.Equals("note_on")) { _code = 0x90; Channel = int.Parse(args[0]); Note = int.Parse(args[1]); Velocity = int.Parse(args[2]); }
+            if (type.Equals("polytouch")) { _code = 0xa0; Channel = int.Parse(args[0]); Note = int.Parse(args[1]); Value = int.Parse(args[2]); }
+            if (type.Equals("control_change")) { _code = 0xb0; Channel = int.Parse(args[0]); Control = int.Parse(args[1]); Value = int.Parse(args[2]); }
+            if (type.Equals("program_change")) { _code = 0xc0; Channel = int.Parse(args[0]); Program = int.Parse(args[1]); }
+            if (type.Equals("aftertouch")) { _code = 0xd0; Channel = int.Parse(args[0]); Value = int.Parse(args[1]); }
+            if (type.Equals("pitchwheel")) { _code = 0xe0; Channel = int.Parse(args[0]); Pitch = int.Parse(args[1]); }
+            if (type.Equals("sysex")) { _code = 0xf0; this.Data = data; }
 
         }
 
-        public List<byte> createBytes()
+        public List<byte> CreateBytes()
         {
             List<byte> data;
-            if (is_meta) data = createMetaBytes();
-            else data = createMessageBytes();
+            if (IsMeta) data = CreateMetaBytes();
+            else data = CreateMessageBytes();
 
             return data;
         }
 
-        public List<byte> createMetaBytes()
+        public List<byte> CreateMetaBytes()
         {
             List<byte> data = new List<byte>();
 
-            if (type.Equals("sequence_number"))
+            if (Type.Equals("sequence_number"))
             {
-                data.Add((byte)(number >> 8));
-                data.Add((byte)(number & 0xff));
+                data.Add((byte)(Number >> 8));
+                data.Add((byte)(Number & 0xff));
             }
-            if (type.Equals("text") || type.Equals("copyright") || type.Equals("lyrics") || type.Equals("marker") || type.Equals("cue_marker"))
+            if (Type.Equals("text") || Type.Equals("copyright") || Type.Equals("lyrics") || Type.Equals("marker") || Type.Equals("cue_marker"))
             {
-                if (text == null) text = "";
-                data.AddRange(MidiExport.ascii.GetBytes(text));
+                if (Text == null) Text = "";
+                data.AddRange(MidiExport.Ascii.GetBytes(Text));
             }
 
-            if (type.Equals("track_name") || type.Equals("instrument_name") || type.Equals("device_name"))
+            if (Type.Equals("track_name") || Type.Equals("instrument_name") || Type.Equals("device_name"))
             {
-                data.AddRange(MidiExport.ascii.GetBytes(name));
+                data.AddRange(MidiExport.Ascii.GetBytes(Name));
             }
-            if (type.Equals("channel_prefix"))
+            if (Type.Equals("channel_prefix"))
             {
-                data.Add((byte)channel);
+                data.Add((byte)Channel);
             }
-            if (type.Equals("midi_port"))
+            if (Type.Equals("midi_port"))
             {
-                data.Add((byte)port);
+                data.Add((byte)Port);
             }
-            if (type.Equals("set_tempo"))
+            if (Type.Equals("set_tempo"))
             {
                 //return [tempo >> 16, tempo >> 8 & 0xff, tempo & 0xff]
-                data.Add((byte)(tempo >> 16));
-                data.Add((byte)((tempo >> 8) & 0xff));
-                data.Add((byte)(tempo & 0xff));
+                data.Add((byte)(Tempo >> 16));
+                data.Add((byte)((Tempo >> 8) & 0xff));
+                data.Add((byte)(Tempo & 0xff));
             }
 
-            if (type.Equals("time_signature"))
+            if (Type.Equals("time_signature"))
             {
-                data.Add((byte)numerator);
-                data.Add((byte)Math.Log(denominator, 2));
-                data.Add((byte)clocks_per_click);
-                data.Add((byte)notated_32nd_notes_per_beat);
+                data.Add((byte)Numerator);
+                data.Add((byte)Math.Log(Denominator, 2));
+                data.Add((byte)ClocksPerClick);
+                data.Add((byte)Notated32NdNotesPerBeat);
             }
 
-            if (type.Equals("key_signature"))
+            if (Type.Equals("key_signature"))
             {
-                data.Add((byte)(key & 0xff));
-                data.Add(is_major ? (byte)0x00 : (byte)0x01);
+                data.Add((byte)(Key & 0xff));
+                data.Add(_isMajor ? (byte)0x00 : (byte)0x01);
             }
 
             int dataLength = data.Count;
-            data.InsertRange(0, MidiExport.encodeVariableInt(dataLength));
-            data.Insert(0, code);
+            data.InsertRange(0, MidiExport.EncodeVariableInt(dataLength));
+            data.Insert(0, _code);
             data.Insert(0, 0xff);
 
             return data;
         }
 
 
-        public List<byte> createMessageBytes()
+        public List<byte> CreateMessageBytes()
         {
 
             List<byte> data = new List<byte>();
@@ -197,43 +203,43 @@ namespace MidiPro.Core.Midi
             if (type.Equals("sysex")) { code = 0xf0; this.data = data; }
               
              */
-            if (type.Equals("note_off") || type.Equals("note_on"))
+            if (Type.Equals("note_off") || Type.Equals("note_on"))
             {
-                data.Add((byte)(code | (byte)channel));
-                data.Add((byte)note); data.Add((byte)velocity);
+                data.Add((byte)(_code | (byte)Channel));
+                data.Add((byte)Note); data.Add((byte)Velocity);
             }
 
-            if (type.Equals("polytouch"))
+            if (Type.Equals("polytouch"))
             {
-                data.Add((byte)(code | (byte)channel));
-                data.Add((byte)note); data.Add((byte)value);
+                data.Add((byte)(_code | (byte)Channel));
+                data.Add((byte)Note); data.Add((byte)Value);
             }
-            if (type.Equals("control_change"))
+            if (Type.Equals("control_change"))
             {
-                data.Add((byte)(code | (byte)channel));
-                data.Add((byte)control); data.Add((byte)value);
+                data.Add((byte)(_code | (byte)Channel));
+                data.Add((byte)Control); data.Add((byte)Value);
             }
-            if (type.Equals("program_change"))
+            if (Type.Equals("program_change"))
             {
-                data.Add((byte)(code | (byte)channel));
-                data.Add((byte)program);
+                data.Add((byte)(_code | (byte)Channel));
+                data.Add((byte)Program);
             }
-            if (type.Equals("aftertouch"))
+            if (Type.Equals("aftertouch"))
             {
-                data.Add((byte)(code | (byte)channel));
-                data.Add((byte)value);
+                data.Add((byte)(_code | (byte)Channel));
+                data.Add((byte)Value);
             }
-            if (type.Equals("pitchwheel"))  //14 bit signed integer
+            if (Type.Equals("pitchwheel"))  //14 bit signed integer
             {
-                data.Add((byte)(code | (byte)channel));
+                data.Add((byte)(_code | (byte)Channel));
                 //data.Add((byte)pitch);
-                pitch -= -8192;
-                data.Add((byte)(pitch & 0x7f));
-                data.Add((byte)(pitch >> 7));
+                Pitch -= -8192;
+                data.Add((byte)(Pitch & 0x7f));
+                data.Add((byte)(Pitch >> 7));
             }
-            if (type.Equals("sysex"))
+            if (Type.Equals("sysex"))
             {
-                data.AddRange(this.data);
+                data.AddRange(this.Data);
             }
 
 

@@ -4,34 +4,39 @@ namespace MidiPro.Core.Midi
 {
     public class MidiTrack
     {
-        public List<MidiMessage> messages = new List<MidiMessage>();
-        public List<byte> createBytes()
+        public List<MidiMessage> Messages { get; set; }
+
+        public MidiTrack()
+        {
+            Messages = new List<MidiMessage>();
+        }
+        public List<byte> CreateBytes()
         {
             List<byte> data = new List<byte>();
             byte runningStatusByte = 0x00;
             bool statusByteSet = false;
-            foreach (MidiMessage message in messages)
+            foreach (MidiMessage message in Messages)
             {
-                if (message.time < 0)
+                if (message.Time < 0)
                 {
-                    message.time = 0;
+                    message.Time = 0;
                 }
-                data.AddRange(MidiExport.encodeVariableInt(message.time));
-                if (message.type.Equals("sysex"))
+                data.AddRange(MidiExport.EncodeVariableInt(message.Time));
+                if (message.Type.Equals("sysex"))
                 {
                     statusByteSet = false;
                     data.Add(0xf0);
-                    data.AddRange(MidiExport.encodeVariableInt(message.data.Length + 1));
-                    data.AddRange(message.data);
+                    data.AddRange(MidiExport.EncodeVariableInt(message.Data.Length + 1));
+                    data.AddRange(message.Data);
                     data.Add(0xf7);
                 }
                 else
                 {
                     List<byte> raw = new List<byte>();
-                    raw = message.createBytes();
+                    raw = message.CreateBytes();
 
                     byte temp = raw[0];
-                    if (statusByteSet && !message.is_meta && raw[0] < 0xf0 && raw[0] == runningStatusByte)
+                    if (statusByteSet && !message.IsMeta && raw[0] < 0xf0 && raw[0] == runningStatusByte)
                     {
                         raw.RemoveAt(0);
                         data.AddRange(raw);
@@ -45,7 +50,7 @@ namespace MidiPro.Core.Midi
                 }
             }
 
-            return MidiExport.writeChunk("MTrk", data);
+            return MidiExport.WriteChunk("MTrk", data);
         }
     }
 }

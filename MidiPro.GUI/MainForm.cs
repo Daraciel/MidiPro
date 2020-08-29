@@ -1,22 +1,23 @@
-﻿using MidiPro.Core.GpFiles;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
 using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
+using MidiPro.Core.GP.Files;
+using MidiPro.Core.Native;
 
 namespace MidiPro.GUI
 {
     public partial class MainForm : Form
     {
+        private GpFile _gpFile;
+
+        private NativeFormat _song;
+
         public MainForm()
         {
             InitializeComponent();
+            _gpFile = null;
+            _song = null;
         }
 
         private void btnSelectInputFile_Click(object sender, EventArgs e)
@@ -36,7 +37,14 @@ namespace MidiPro.GUI
         {
             if (File.Exists(tbGpFilename.Text))
             {
-                ReadFile(tbGpFilename.Text);
+                var midi = nfSong.GetMidi();
+                List<byte> data = midi.CreateBytes();
+                var dataArray = data.ToArray();
+                using (var fs = new FileStream("output.mid", FileMode.OpenOrCreate, FileAccess.ReadWrite))
+                {
+                    fs.Write(dataArray, 0, dataArray.Length);
+
+                }
             }
             else
             {
@@ -47,7 +55,6 @@ namespace MidiPro.GUI
         private void ReadFile(string path)
         {
             string extension = string.Empty;
-            GpFile gpfile = null;
 
 
             extension = Path.GetExtension(path).ToUpper();
@@ -55,13 +62,28 @@ namespace MidiPro.GUI
             switch (extension)
             {
                 case ".GP3":
-                    gpfile = new Gp3File(File.ReadAllBytes(path));
+                    _gpFile = new Gp3File(File.ReadAllBytes(path));
                     break;
                 case ".GP4":
-                    gpfile = new Gp4File(File.ReadAllBytes(path));
+                    _gpFile = new Gp4File(File.ReadAllBytes(path));
                     break;
             }
-            gpfile?.ReadSong();
+            _gpFile?.ReadSong();
+        }
+
+        private void btnReadPgxFile_Click(object sender, EventArgs e)
+        {
+            if (File.Exists(tbGpFilename.Text))
+            {
+                ReadFile(tbGpFilename.Text);
+
+                _song = new NativeFormat(_gpFile);
+                nfSong.SetData(_song);
+            }
+            else
+            {
+                MessageBox.Show("El fichero especificado no existe", "Fallo", MessageBoxButtons.OK);
+            }
         }
     }
 }

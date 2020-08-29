@@ -2,6 +2,11 @@
 {
     public enum HarmonicTypes
     {
-        none = 0, natural = 1, artificial = 2, pinch = 3, semi = 4, tapped = 5
+        None = 0, 
+        Natural = 1, 
+        Artificial = 2, 
+        Pinch = 3, 
+        Semi = 4, 
+        Tapped = 5
     }
 }
